@@ -13,6 +13,10 @@ DEFAULT_CONFIG = {
     'BRIGHTDATA_API_TOKEN': os.getenv('BRIGHTDATA_API_TOKEN', ''),
     'BRIGHTDATA_WEB_UNLOCKER_ZONE': os.getenv('BRIGHTDATA_WEB_UNLOCKER_ZONE', 'mcp_unlocker'),
     'BRIGHTDATA_BROWSER_AUTH': os.getenv('BRIGHTDATA_BROWSER_AUTH', ''),
+    'ZOHO_REFRESH_TOKEN': os.getenv('ZOHO_REFRESH_TOKEN', ''),
+    'ZOHO_CLIENT_ID': os.getenv('ZOHO_CLIENT_ID', ''),
+    'ZOHO_CLIENT_SECRET': os.getenv('ZOHO_CLIENT_SECRET', ''),
+    'CALLBACK_URL': os.getenv('CALLBACK_URL', 'https://your-webhook-url.com'),
 }
 
 def load_config():

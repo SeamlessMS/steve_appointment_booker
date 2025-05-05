@@ -11,6 +11,12 @@ export default function SettingsModal({ open, onClose, onSave }) {
     ELEVENLABS_API_KEY: '',
     ELEVENLABS_AGENT_ID: '',
     LLM_API_KEY: '',
+    BRIGHTDATA_API_TOKEN: '',
+    BRIGHTDATA_WEB_UNLOCKER_ZONE: '',
+    ZOHO_REFRESH_TOKEN: '',
+    ZOHO_CLIENT_ID: '',
+    ZOHO_CLIENT_SECRET: '',
+    CALLBACK_URL: '',
   });
   const [loading, setLoading] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -37,19 +43,50 @@ export default function SettingsModal({ open, onClose, onSave }) {
   if (!open) return null;
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
-      <div className="bg-white p-6 rounded shadow max-w-lg w-full relative">
+      <div className="bg-white p-6 rounded shadow max-w-lg w-full relative overflow-y-auto max-h-screen">
         <button className="absolute top-2 right-2 text-xl" onClick={onClose}>&times;</button>
         <h2 className="text-lg font-bold mb-4">API Key Settings</h2>
-        <div className="space-y-2">
-          <input name="TWILIO_ACCOUNT_SID" value={config.TWILIO_ACCOUNT_SID} onChange={handleChange} placeholder="Twilio Account SID" className="w-full border p-2 rounded" />
-          <input name="TWILIO_AUTH_TOKEN" value={config.TWILIO_AUTH_TOKEN} onChange={handleChange} placeholder="Twilio Auth Token" className="w-full border p-2 rounded" />
-          <input name="TWILIO_PHONE_NUMBER" value={config.TWILIO_PHONE_NUMBER} onChange={handleChange} placeholder="Twilio Phone Number" className="w-full border p-2 rounded" />
-          <input name="ELEVENLABS_API_KEY" value={config.ELEVENLABS_API_KEY} onChange={handleChange} placeholder="ElevenLabs API Key" className="w-full border p-2 rounded" />
-          <input name="ELEVENLABS_AGENT_ID" value={config.ELEVENLABS_AGENT_ID} onChange={handleChange} placeholder="ElevenLabs Agent ID" className="w-full border p-2 rounded" />
-          <input name="LLM_API_KEY" value={config.LLM_API_KEY} onChange={handleChange} placeholder="LLM API Key" className="w-full border p-2 rounded" />
+        
+        <div className="space-y-4">
+          <div>
+            <h3 className="font-medium mb-2">Twilio Voice Settings</h3>
+            <div className="space-y-2">
+              <input name="TWILIO_ACCOUNT_SID" value={config.TWILIO_ACCOUNT_SID} onChange={handleChange} placeholder="Twilio Account SID" className="w-full border p-2 rounded" />
+              <input name="TWILIO_AUTH_TOKEN" value={config.TWILIO_AUTH_TOKEN} onChange={handleChange} placeholder="Twilio Auth Token" className="w-full border p-2 rounded" />
+              <input name="TWILIO_PHONE_NUMBER" value={config.TWILIO_PHONE_NUMBER} onChange={handleChange} placeholder="Twilio Phone Number" className="w-full border p-2 rounded" />
+              <input name="CALLBACK_URL" value={config.CALLBACK_URL} onChange={handleChange} placeholder="Webhook Callback URL" className="w-full border p-2 rounded" />
+            </div>
+          </div>
+          
+          <div>
+            <h3 className="font-medium mb-2">AI Voice & Intelligence</h3>
+            <div className="space-y-2">
+              <input name="ELEVENLABS_API_KEY" value={config.ELEVENLABS_API_KEY} onChange={handleChange} placeholder="ElevenLabs API Key" className="w-full border p-2 rounded" />
+              <input name="ELEVENLABS_AGENT_ID" value={config.ELEVENLABS_AGENT_ID} onChange={handleChange} placeholder="ElevenLabs Voice ID" className="w-full border p-2 rounded" />
+              <input name="LLM_API_KEY" value={config.LLM_API_KEY} onChange={handleChange} placeholder="OpenAI API Key" className="w-full border p-2 rounded" />
+            </div>
+          </div>
+          
+          <div>
+            <h3 className="font-medium mb-2">Lead Scraping</h3>
+            <div className="space-y-2">
+              <input name="BRIGHTDATA_API_TOKEN" value={config.BRIGHTDATA_API_TOKEN} onChange={handleChange} placeholder="Bright Data API Token" className="w-full border p-2 rounded" />
+              <input name="BRIGHTDATA_WEB_UNLOCKER_ZONE" value={config.BRIGHTDATA_WEB_UNLOCKER_ZONE} onChange={handleChange} placeholder="Bright Data Zone Name" className="w-full border p-2 rounded" />
+            </div>
+          </div>
+          
+          <div>
+            <h3 className="font-medium mb-2">Zoho CRM Integration</h3>
+            <div className="space-y-2">
+              <input name="ZOHO_CLIENT_ID" value={config.ZOHO_CLIENT_ID} onChange={handleChange} placeholder="Zoho Client ID" className="w-full border p-2 rounded" />
+              <input name="ZOHO_CLIENT_SECRET" value={config.ZOHO_CLIENT_SECRET} onChange={handleChange} placeholder="Zoho Client Secret" className="w-full border p-2 rounded" />
+              <input name="ZOHO_REFRESH_TOKEN" value={config.ZOHO_REFRESH_TOKEN} onChange={handleChange} placeholder="Zoho Refresh Token" className="w-full border p-2 rounded" />
+            </div>
+          </div>
         </div>
-        <button onClick={handleSave} className="mt-4 bg-indigo-600 text-white px-6 py-2 rounded hover:bg-indigo-700 disabled:opacity-50" disabled={loading}>
-          {loading ? 'Saving...' : 'Save'}
+        
+        <button onClick={handleSave} className="mt-6 bg-indigo-600 text-white px-6 py-2 rounded hover:bg-indigo-700 disabled:opacity-50" disabled={loading}>
+          {loading ? 'Saving...' : 'Save Settings'}
         </button>
         {saved && <div className="text-green-600 mt-2">Saved!</div>}
       </div>

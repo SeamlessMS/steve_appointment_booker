@@ -5,6 +5,7 @@ import os
 import tempfile
 from config import get_config
 import logging
+import random
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -62,8 +63,8 @@ def run_mcp_scraper(prompt, config_path):
                     except json.JSONDecodeError:
                         continue
             
-            if json_data and 'agents' in json_data:
-                return json_data['agents']
+            if json_data and 'businesses' in json_data:
+                return json_data['businesses']
             elif json_data:
                 return [json_data]
             else:
@@ -82,8 +83,8 @@ def run_mcp_scraper(prompt, config_path):
         if os.path.exists(config_path):
             os.unlink(config_path)
 
-def scrape_realtor_agents(location="Austin, TX", limit=30):
-    """Scrape real estate agents from Realtor.com using Bright Data MCP"""
+def scrape_businesses(location="Denver, CO", industry="Plumbing", limit=30):
+    """Scrape businesses from Google Maps or business directories using Bright Data MCP"""
     config = get_config()
     api_token = config['BRIGHTDATA_API_TOKEN']
     web_unlocker_zone = config['BRIGHTDATA_WEB_UNLOCKER_ZONE']
@@ -91,32 +92,37 @@ def scrape_realtor_agents(location="Austin, TX", limit=30):
     
     if not api_token:
         logger.warning("No Bright Data API token provided. Using dummy data.")
-        return generate_dummy_agents(location, limit)
+        return generate_dummy_businesses(location, industry, limit)
     
     # Create MCP config file
     config_path = create_mcp_config(api_token, web_unlocker_zone, browser_auth)
     
-    # Craft the prompt for agent extraction
-    prompt = f"Extract data for {limit} real estate agents in {location} from Realtor.com. For each agent, get their name, phone number, brokerage name, address, and website if available. Return as structured JSON."
+    # Craft the prompt for business extraction
+    prompt = f"Extract data for {limit} {industry} companies in {location} from Google Maps or business directories. For each business, get their name, phone number, address, website if available, and estimate the number of employees if shown. Return as structured JSON."
     
     # Run the MCP scraper
-    agents = run_mcp_scraper(prompt, config_path)
+    businesses = run_mcp_scraper(prompt, config_path)
     
     # Process and format the results
-    formatted_agents = []
-    for agent in agents[:limit]:
-        formatted_agents.append({
-            'name': agent.get('name', 'Unknown Agent'),
-            'phone': agent.get('phone', 'N/A'),
-            'category': 'Real Estate Agent',
-            'address': agent.get('address', f'{location}'),
-            'website': agent.get('website', '')
+    formatted_businesses = []
+    for business in businesses[:limit]:
+        city, state = extract_city_state(business.get('address', location))
+        formatted_businesses.append({
+            'name': business.get('name', f'Unknown {industry} Business'),
+            'phone': business.get('phone', 'N/A'),
+            'category': industry,
+            'address': business.get('address', location),
+            'website': business.get('website', ''),
+            'employee_count': business.get('employee_count', 0),
+            'city': city,
+            'state': state,
+            'industry': industry
         })
     
-    return formatted_agents
+    return formatted_businesses
 
-def scrape_zillow_agents(location="Austin, TX", limit=30):
-    """Scrape real estate agents from Zillow using Bright Data MCP"""
+def scrape_yelp_businesses(location="Denver, CO", industry="Plumbing", limit=30):
+    """Scrape businesses from Yelp using Bright Data MCP"""
     config = get_config()
     api_token = config['BRIGHTDATA_API_TOKEN']
     web_unlocker_zone = config['BRIGHTDATA_WEB_UNLOCKER_ZONE']
@@ -124,197 +130,152 @@ def scrape_zillow_agents(location="Austin, TX", limit=30):
     
     if not api_token:
         logger.warning("No Bright Data API token provided. Using dummy data.")
-        return generate_dummy_agents(location, limit)
+        return generate_dummy_businesses(location, industry, limit)
     
     # Create MCP config file
     config_path = create_mcp_config(api_token, web_unlocker_zone, browser_auth)
     
-    # Craft the prompt for agent extraction
-    prompt = f"Extract data for {limit} real estate agents in {location} from Zillow.com. For each agent, get their name, phone number, brokerage name, address, and website if available. Return as structured JSON."
+    # Craft the prompt for business extraction
+    prompt = f"Extract data for {limit} {industry} businesses in {location} from Yelp.com. For each business, get their name, phone number, address, website if available, and any info about business size or number of employees. Return as structured JSON."
     
     # Run the MCP scraper
-    agents = run_mcp_scraper(prompt, config_path)
+    businesses = run_mcp_scraper(prompt, config_path)
     
     # Process and format the results
-    formatted_agents = []
-    for agent in agents[:limit]:
-        formatted_agents.append({
-            'name': agent.get('name', 'Unknown Agent'),
-            'phone': agent.get('phone', 'N/A'),
-            'category': 'Real Estate Agent',
-            'address': agent.get('address', f'{location}'),
-            'website': agent.get('website', '')
+    formatted_businesses = []
+    for business in businesses[:limit]:
+        city, state = extract_city_state(business.get('address', location))
+        formatted_businesses.append({
+            'name': business.get('name', f'Unknown {industry} Business'),
+            'phone': business.get('phone', 'N/A'),
+            'category': industry,
+            'address': business.get('address', location),
+            'website': business.get('website', ''),
+            'employee_count': estimate_employee_count(business),
+            'city': city,
+            'state': state,
+            'industry': industry
         })
     
-    return formatted_agents
+    return formatted_businesses
 
-def mine_social_media_for_buyers(location="Austin, TX", limit=20):
-    """Mine social media for buyer intent signals using Bright Data MCP"""
-    config = get_config()
-    api_token = config['BRIGHTDATA_API_TOKEN']
-    web_unlocker_zone = config['BRIGHTDATA_WEB_UNLOCKER_ZONE']
-    browser_auth = config.get('BRIGHTDATA_BROWSER_AUTH', '')
+def estimate_employee_count(business):
+    """Estimate employee count based on business data"""
+    # Try to use explicit employee count if available
+    if 'employee_count' in business and business['employee_count']:
+        try:
+            return int(business['employee_count'])
+        except (ValueError, TypeError):
+            pass
     
-    if not api_token:
-        logger.warning("No Bright Data API token provided. Using dummy data.")
-        return generate_dummy_buyers(location, limit)
+    # Try to extract from description if available
+    if 'description' in business:
+        desc = business['description'].lower()
+        if 'team of ' in desc:
+            try:
+                idx = desc.index('team of ') + 8
+                end_idx = idx
+                while end_idx < len(desc) and (desc[end_idx].isdigit() or desc[end_idx] == ' '):
+                    end_idx += 1
+                num = ''.join(c for c in desc[idx:end_idx] if c.isdigit())
+                if num:
+                    return int(num)
+            except:
+                pass
     
-    # Create MCP config file
-    config_path = create_mcp_config(api_token, web_unlocker_zone, browser_auth)
+    # Use number of reviews as a rough proxy for size if available
+    if 'review_count' in business and business['review_count']:
+        try:
+            reviews = int(business['review_count'])
+            if reviews > 50:
+                return 15
+            elif reviews > 20:
+                return 10
+            else:
+                return 5
+        except:
+            pass
     
-    # Craft prompts for different platforms
-    platforms = [
-        {
-            "name": "Reddit",
-            "prompt": f"Find recent posts on Reddit where people are talking about moving to {location} or looking for housing in {location}. Extract their requirements, budget if mentioned, and any other relevant details. Return as structured JSON."
-        },
-        {
-            "name": "Twitter",
-            "prompt": f"Find recent tweets where people mention moving to {location}, looking for houses in {location}, or needing a real estate agent in {location}. Return as structured JSON."
-        },
-        {
-            "name": "Facebook Groups",
-            "prompt": f"Find housing or real estate focused Facebook groups for {location} and extract recent posts from people looking to buy or rent. Return as structured JSON."
-        }
-    ]
-    
-    all_buyers = []
-    for platform in platforms:
-        # Run the MCP scraper for each platform
-        buyers = run_mcp_scraper(platform["prompt"], config_path)
-        all_buyers.extend(buyers)
-        
-        # Recreate config file for each platform
-        config_path = create_mcp_config(api_token, web_unlocker_zone, browser_auth)
-    
-    # Process and format the results
-    formatted_buyers = []
-    for buyer in all_buyers[:limit]:
-        formatted_buyers.append({
-            'platform': buyer.get('platform', 'Unknown'),
-            'user_id': buyer.get('user_id', 'anonymous'),
-            'post_content': buyer.get('content', ''),
-            'location_interest': buyer.get('location', location),
-            'requirements': buyer.get('requirements', ''),
-            'budget': buyer.get('budget', 'Not specified'),
-            'timestamp': buyer.get('timestamp', '')
-        })
-    
-    return formatted_buyers
+    # Default estimate based on business category
+    return 10  # Default: assume 10 employees
 
-def match_buyers_to_agents(buyers, agents, location="Austin, TX"):
-    """Match potential buyers with suitable real estate agents based on location and requirements"""
-    matches = []
+def extract_city_state(address):
+    """Extract city and state from an address string"""
+    if not address:
+        return "Unknown", "Unknown"
     
-    for agent in agents:
-        # Extract zip code from agent address if available
-        agent_zip = extract_zip_from_address(agent['address']) or location
-        
-        matched_buyers = []
-        for buyer in buyers:
-            # Check if buyer's location interest matches agent's area
-            if location_match(buyer['location_interest'], agent_zip):
-                matched_buyers.append(buyer)
-        
-        if matched_buyers:
-            matches.append({
-                'agent': agent,
-                'potential_buyers': matched_buyers,
-                'buyer_count': len(matched_buyers)
-            })
-    
-    # Sort matches by number of potential buyers (descending)
-    matches.sort(key=lambda x: x['buyer_count'], reverse=True)
-    
-    return matches
-
-def extract_zip_from_address(address):
-    """Extract zip code from an address string"""
     # Simple implementation - would need to be more robust in production
-    parts = address.split()
-    for part in parts:
-        if len(part) == 5 and part.isdigit():
-            return part
-    return None
-
-def location_match(buyer_location, agent_location):
-    """Check if buyer and agent locations match"""
-    # Simple implementation - in production would use more sophisticated geo-matching
-    return buyer_location.lower() in agent_location.lower() or agent_location.lower() in buyer_location.lower()
-
-def generate_dummy_agents(location="Austin, TX", limit=30):
-    """Generate dummy agent data when API key is not available"""
-    dummy_agents = []
-    brokerages = ["Century 21", "RE/MAX", "Keller Williams", "Coldwell Banker", "Sotheby's"]
+    parts = address.split(',')
+    if len(parts) >= 2:
+        city = parts[-2].strip()
+        state_zip = parts[-1].strip().split()
+        state = state_zip[0] if state_zip else "Unknown"
+        return city, state
     
+    return "Unknown", "Unknown"
+
+def generate_dummy_businesses(location="Denver, CO", industry="Plumbing", limit=30):
+    """Generate dummy business data for testing"""
+    cities = ["Denver", "Colorado Springs"]
+    industries = ["Plumbing", "Electrical", "Construction", "HVAC", "Landscaping"]
+    
+    if location.startswith("Denver"):
+        city = "Denver"
+        state = "CO"
+    elif location.startswith("Colorado Springs"):
+        city = "Colorado Springs"
+        state = "CO"
+    else:
+        city = cities[0]
+        state = "CO"
+    
+    if industry not in industries:
+        industry = random.choice(industries)
+    
+    businesses = []
     for i in range(limit):
-        dummy_agents.append({
-            'name': f"Agent Smith {i+1}",
-            'phone': f"512-555-{1000+i}",
-            'category': 'Real Estate Agent',
-            'address': f"{100+i} Main St, {location}",
-            'website': f"https://agent{i+1}.realtor.example.com"
-        })
-    
-    return dummy_agents
-
-def generate_dummy_buyers(location="Austin, TX", limit=20):
-    """Generate dummy buyer data when API key is not available"""
-    dummy_buyers = []
-    platforms = ["Reddit", "Twitter", "Facebook"]
-    requirements = [
-        "3BR/2BA single family home",
-        "Condo near downtown",
-        "House with yard for dogs",
-        "New construction in suburbs",
-        "Townhouse with garage"
-    ]
-    
-    for i in range(limit):
-        platform = platforms[i % len(platforms)]
-        requirement = requirements[i % len(requirements)]
+        business_name = f"{industry} Pro {i+1}"
+        employee_count = random.randint(5, 50)
         
-        dummy_buyers.append({
-            'platform': platform,
-            'user_id': f"user{i+1}",
-            'post_content': f"Looking to move to {location} soon. Need help finding a {requirement}.",
-            'location_interest': location,
-            'requirements': requirement,
-            'budget': f"${300000 + (i * 50000)}",
-            'timestamp': "2023-05-01"
+        businesses.append({
+            'name': business_name,
+            'phone': f"720-555-{1000+i:04d}",
+            'category': industry,
+            'address': f"{100+i} Main St, {city}, {state} 80{200+i}",
+            'website': f"https://www.{business_name.lower().replace(' ', '')}.com",
+            'employee_count': employee_count,
+            'city': city,
+            'state': state,
+            'industry': industry
         })
     
-    return dummy_buyers
+    return businesses
 
-def scrape_real_estate_leads(location="Austin, TX", limit=30):
-    """Main function to scrape real estate agents and match with potential buyers"""
-    # Get agents from multiple sources
-    realtor_agents = scrape_realtor_agents(location, limit//2)
-    zillow_agents = scrape_zillow_agents(location, limit//2)
+def scrape_business_leads(location="Denver, CO", industry="Plumbing", limit=30):
+    """Scrape business leads from various sources"""
+    if ',' not in location:
+        location = f"{location}, CO"
     
-    # Combine agents from different sources
-    all_agents = realtor_agents + zillow_agents
+    config = get_config()
     
-    # Mine social media for buyer intent signals
-    buyers = mine_social_media_for_buyers(location, limit)
-    
-    # Match buyers with agents
-    matches = match_buyers_to_agents(buyers, all_agents, location)
-    
-    # Return matched agents with buyer counts
-    enhanced_agents = []
-    for match in matches:
-        agent = match['agent'].copy()
-        agent['buyer_count'] = match['buyer_count']
-        enhanced_agents.append(agent)
-    
-    # If we don't have enough matches, add remaining agents
-    if len(enhanced_agents) < limit:
-        for agent in all_agents:
-            if agent not in [a for a in enhanced_agents]:
-                agent['buyer_count'] = 0
-                enhanced_agents.append(agent)
-                if len(enhanced_agents) >= limit:
-                    break
-    
-    return enhanced_agents[:limit]
+    # If Bright Data API token is available, use the real scrapers
+    if config['BRIGHTDATA_API_TOKEN']:
+        # Scrape from multiple sources and combine results
+        businesses = []
+        
+        # Try to get half from Google Maps/Directories and half from Yelp
+        half_limit = limit // 2
+        businesses.extend(scrape_businesses(location, industry, half_limit))
+        businesses.extend(scrape_yelp_businesses(location, industry, half_limit))
+        
+        # If we didn't get enough, try to fill in
+        if len(businesses) < limit:
+            # Try to get more from the first source
+            more_businesses = scrape_businesses(location, industry, limit - len(businesses))
+            businesses.extend(more_businesses)
+        
+        # Limit to the requested number
+        return businesses[:limit]
+    else:
+        # Use dummy data if no Bright Data API token
+        return generate_dummy_businesses(location, industry, limit)

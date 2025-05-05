@@ -25,7 +25,15 @@ def init_db():
                 address TEXT,
                 website TEXT,
                 status TEXT DEFAULT 'Not Called',
-                buyer_count INTEGER DEFAULT 0
+                employee_count INTEGER DEFAULT 0,
+                uses_mobile_devices TEXT DEFAULT 'Unknown',
+                industry TEXT,
+                city TEXT,
+                state TEXT,
+                appointment_date TEXT,
+                appointment_time TEXT,
+                qualification_status TEXT DEFAULT 'Not Qualified',
+                notes TEXT
             )
         ''')
         c.execute('''
@@ -38,12 +46,37 @@ def init_db():
                 FOREIGN KEY (lead_id) REFERENCES leads(id)
             )
         ''')
+        c.execute('''
+            CREATE TABLE IF NOT EXISTS appointments (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                lead_id INTEGER,
+                date TEXT,
+                time TEXT,
+                status TEXT DEFAULT 'Scheduled',
+                medium TEXT DEFAULT 'Phone',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (lead_id) REFERENCES leads(id)
+            )
+        ''')
         conn.commit()
         
-        # Check if buyer_count column exists and add it if not
-        try:
-            conn.execute('SELECT buyer_count FROM leads LIMIT 1')
-        except sqlite3.OperationalError:
-            # Column doesn't exist, add it
-            conn.execute('ALTER TABLE leads ADD COLUMN buyer_count INTEGER DEFAULT 0')
-            conn.commit()
+        # Check if new columns exist and add them if not
+        columns_to_add = [
+            ('employee_count', 'INTEGER DEFAULT 0'),
+            ('uses_mobile_devices', 'TEXT DEFAULT "Unknown"'),
+            ('industry', 'TEXT'),
+            ('city', 'TEXT'),
+            ('state', 'TEXT'),
+            ('appointment_date', 'TEXT'),
+            ('appointment_time', 'TEXT'),
+            ('qualification_status', 'TEXT DEFAULT "Not Qualified"'),
+            ('notes', 'TEXT')
+        ]
+        
+        for col_name, col_type in columns_to_add:
+            try:
+                conn.execute(f'SELECT {col_name} FROM leads LIMIT 1')
+            except sqlite3.OperationalError:
+                # Column doesn't exist, add it
+                conn.execute(f'ALTER TABLE leads ADD COLUMN {col_name} {col_type}')
+                conn.commit()
