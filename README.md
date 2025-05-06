@@ -1,176 +1,252 @@
-# 🤖 AI Sales Intern (Ava)
+# Seamless Mobile Services Appointment Booker for Mobile Service Businesses
 
-An autonomous voice agent that scrapes real estate leads, matches them with potential buyers, makes calls, closes deals, and makes money while you sleep.
+An AI-powered appointment setting system adapted for mobile service businesses in Denver/Colorado Springs. This system follows Steve Schiffman's appointment-setting methodology to qualify leads and set appointments for companies with 10+ employees using mobile devices.
 
-## 🌟 What It Does
+## Key Features
 
-This tool creates an AI-powered sales representative that:
+- **Automated Lead Generation**: Scrapes business leads from online sources focused on service industries
+- **AI Voice Calls**: Uses Twilio for phone calls and ElevenLabs for natural voice synthesis
+- **Steve Schiffman Methodology**: Follows proven appointment setting script structure
+- **Business Hours Restriction**: Calls only allowed Monday-Friday 9:30AM-4:00PM Mountain Time 
+- **Zoho CRM Integration**: Syncs leads, qualification data, and appointments with Zoho
+- **Mobile Service Business Focus**: Targets companies with field service crews using mobile devices
+- **Dual Service Offering**: Provides both telecom expense management and mobile device management
 
-1. **Scrapes real estate agent leads** from platforms like Realtor.com and Zillow
-2. **Mines buyer intent signals** from Twitter, Reddit, and Facebook groups
-3. **Matches buyers to agents** based on location and specialization
-4. **Makes real phone calls** using natural-sounding AI voice
-5. **Handles live conversations** with GPT-4 intelligence
-6. **Closes sales autonomously** and logs everything to your dashboard
-7. **Runs 24/7** - works while you sleep, doesn't take breaks, never complains
+## Target Business Types
 
-## 📋 Real-World Results
+The system is optimized for the following types of businesses:
 
-In a real test with real estate agents:
-- 38 outbound calls
-- 11 live conversations  
-- 4 paid signups at $149 each
-- $596 in revenue
-- $578 profit after costs ($18 total for API calls)
-- 10.5% conversion rate (3x industry average)
-- TCPA compliant with clear disclosures
+### Field Service Businesses (heavy mobile use)
+- Plumbing companies
+- HVAC & heating contractors
+- Electrical contractors
+- General construction firms
+- Roofing companies
+- Pest control companies
+- Septic/waste removal services
+- Landscaping companies
 
-## 🚀 Quick Start for Beginners
+*These businesses equip techs with phones/tablets to track jobs, manage schedules, and communicate.*
 
-### Step 1: Clone the Repository
-```bash
-git clone https://github.com/llSourcell/my_ai_intern.git
-cd my_ai_intern
-```
+### Fleet & Logistics Operations
+- Delivery companies
+- Trucking companies
+- Courier services
+- Towing companies
+- Field inspection agencies
+- Waste management contractors
 
-### Step 2: Set Up API Keys
-Create a `.env` file in the `/backend` directory:
+*They often have dispatch systems that depend on smartphones or tablets, and need usage monitoring.*
 
+### Labor-Heavy or Jobsite-Heavy Businesses
+- Construction & excavation
+- Concrete companies
+- Drilling & boring contractors
+- Utility contractors (fiber, power, water)
+
+*Lots of crews in the field = lots of devices that need managing.*
+
+### Technical Field Services
+- Telecom installation companies
+- Security system installers
+- Solar panel installers
+- Maintenance companies
+
+*High tech reliance = great fit for MDM and app support.*
+
+### Mobile Healthcare & Home Services
+- In-home care agencies
+- Mobile phlebotomy / lab testing
+- Rehab or therapy on-site services
+
+*HIPAA compliance and secure mobile communication matters — a strong pitch point.*
+
+### Multi-location Small Chains
+- Property management companies
+- Car dealerships
+- Franchise service businesses (cleaning, pest, etc.)
+- Private security companies
+- Independent schools or tutoring centers
+
+*Often overlooked but often overspend on lines and have multiple devices across sites.*
+
+### Qualification Filters
+When generating leads, look for:
+- 10–200 employees
+- Keywords: "fleet", "dispatch", "technician", "field service", or "tablet" in job descriptions or websites
+
+## Getting Started
+
+### Prerequisites
+
+- Python 3.8+ 
+- Node.js 14+
+- API keys for:
+  - Twilio (phone calls)
+  - ElevenLabs (voice synthesis)
+  - OpenAI/GPT-4 (conversation AI)
+  - Bright Data (lead scraping)
+  - Zoho CRM (optional)
+
+### Installation
+
+1. Clone the repository
+2. Set up a virtual environment for Python
+3. Install backend dependencies:
+   ```
+   cd backend
+   pip install -r requirements.txt
+   ```
+4. Install frontend dependencies:
+   ```
+   cd frontend
+   npm install
+   ```
+
+### Configuration
+
+Create a `.env` file in the `backend` directory with the following keys:
 ```
 TWILIO_ACCOUNT_SID=your_twilio_sid
-TWILIO_AUTH_TOKEN=your_twilio_auth_token
-TWILIO_PHONE_NUMBER=your_twilio_phone_number
-ELEVENLABS_API_KEY=your_elevenlabs_api_key
-ELEVENLABS_AGENT_ID=h3dC4sQ9cPDtYItAe0Z8
-LLM_API_KEY=your_openai_api_key
-BRIGHTDATA_API_TOKEN=your_brightdata_api_token
+TWILIO_AUTH_TOKEN=your_twilio_token
+TWILIO_PHONE_NUMBER=your_twilio_phone
+ELEVENLABS_API_KEY=your_elevenlabs_key
+ELEVENLABS_AGENT_ID=your_voice_id_or_leave_default
+LLM_API_KEY=your_openai_key
+BRIGHTDATA_API_TOKEN=your_brightdata_token
 BRIGHTDATA_WEB_UNLOCKER_ZONE=your_zone_name
-DB_TYPE=sqlite
-DATABASE_URL=sqlite:///leads.db
+CALLBACK_URL=your_webhook_url_or_localhost
+ZOHO_ORG_ID=your_zoho_org_id
+ZOHO_CLIENT_ID=your_zoho_client_id
+ZOHO_CLIENT_SECRET=your_zoho_client_secret
+ZOHO_REFRESH_TOKEN=your_zoho_refresh_token
+ZOHO_DEPARTMENT_ID=your_zoho_department_id
 ```
 
-Where to get API keys:
-- **Twilio:** Sign up at [twilio.com](https://www.twilio.com) (provides phone capabilities)
-- **ElevenLabs:** Sign up at [elevenlabs.io](https://elevenlabs.io) (provides realistic voices)
-- **OpenAI:** Sign up at [openai.com](https://openai.com) (powers the AI conversations)
-- **Bright Data:** Sign up at [brightdata.com](https://brightdata.com) - receive $10 free MCP credits (powers web scraping)
+Alternatively, you can enter these values in the Settings UI after starting the application.
 
-### Step 3: Install Dependencies
+### Running the Application
 
-```bash
-# Install backend dependencies
+For the easiest startup, use one of the restart scripts:
+
+**Windows Batch File**:
+```
+restart.bat
+```
+
+**PowerShell Script**:
+```
+.\restart.ps1
+```
+
+These scripts will:
+1. Kill any processes using ports 5003 and 3000
+2. Clean up any lingering Node.js or Python processes
+3. Start the backend on port 5003
+4. Start the frontend on port 3000
+
+Access the application at: http://localhost:3000
+
+### Manual Startup
+
+If you prefer to start servers manually:
+
+**Backend**:
+```
 cd backend
-pip install -r requirements.txt
-
-# Install frontend dependencies
-cd ../frontend
-npm install
+python app.py --port=5003
 ```
 
-### Step 4: Run the Application
-
-```bash
-# Start the backend (from the backend directory)
-python app.py
-
-# In a new terminal, start the frontend (from the frontend directory)
+**Frontend**:
+```
+cd frontend
 npm start
 ```
 
-The dashboard will open at `http://localhost:3000`
+## Using the Application
 
-## 💡 How to Use
+### Adding Leads
 
-1. **Configure your API keys** in the dashboard settings
-2. Click **"Scrape New Leads"** to gather real estate agents
-3. The system will automatically match agents with potential buyers from social media
-4. Select leads and click **"Call"** to initiate automated outreach
-5. Monitor conversations and results in real-time
-6. View call logs and transcripts for each lead
+1. **Scrape Leads**:
+   - Select location, industry, and number of leads to find
+   - Click "Find New Leads"
 
-## 🛠️ Customization
+2. **Add Leads Manually**:
+   - Click "Add Lead"
+   - Fill out the business information
+   - Click "Add Lead"
 
-### Lead Generation Process
+### Making Calls
 
-1. **Scrape Real Estate Agents:** Uses Bright Data's MCP to pull agent data from Realtor.com and Zillow
-   ```python
-   # MCP servers provide stealth mode for bots - unblockable real-time web access
-   # Using Bright Data's Web Unlocker to access agent listings
-   agents = scrape_agents_via_mcp("Austin, TX", limit=100)
-   ```
+1. Click the "Call" button next to a lead
+2. The system will check if it's during business hours
+3. The AI will follow the Schiffman method:
+   - Introduction
+   - Qualifying questions (mobile devices, employee count)
+   - Brief value statement
+   - Appointment setting
+   - Objection handling
+   - Close
 
-2. **Mine Buyer Intent:** Searches social media for people looking to buy/sell
-   ```python
-   # Search for posts like "Moving to Austin" or "Need a 3-bed in 78704"
-   buyer_signals = mine_intent_signals(["twitter", "reddit", "facebook_groups"])
-   ```
+### Viewing Call Results
 
-3. **Match Buyers to Agents:** Connects buyers with agents in the same areas
-   ```python
-   # Match based on zip code, property type, and specialization
-   matched_leads = match_buyer_to_agent(buyer_signals, agents)
-   ```
+1. Click the "Transcript" button to view call history
+2. Use the "Qualify" button to update lead qualification 
+3. Book appointments for qualified leads
 
-### Customize Sales Scripts
+## Business Hours
 
-Modify the prompt in `voice.py` to change the sales approach:
+Calls can only be made:
+- Monday through Friday
+- 9:30 AM to 4:00 PM Mountain Time
 
-```python
-# Customize your sales script here
-script = f"Hi {agent_name}, this is Ava from Home IQ. We've tracked {buyer_count} qualified buyers searching in {zip_code} right now. Would you like a list?"
-```
+Calls already in progress will be allowed to complete even if they extend past business hours.
 
-## 🔍 Technical Details
+## Integrations
 
-- **Backend:** Flask, SQLite, Bright Data MCP for scraping
-- **APIs:** Twilio (calls), ElevenLabs (voice), OpenAI (GPT-4 intelligence)
-- **Frontend:** React with Tailwind UI
-- **Performance:** Automated scheduling, call logging, analytics
+### Zoho CRM 
 
-### Bright Data MCP Integration
+When properly configured, the system:
+1. Creates new leads in Zoho
+2. Updates qualification status
+3. Creates calendar events for appointments
 
-This project uses Bright Data's Model Context Protocol (MCP) servers for powerful web scraping:
+## Customization
 
-- **Unblockable Access:** MCP servers provide stealth mode that can bypass CAPTCHAs and blocks
-- **Global Coverage:** Access data from anywhere with worldwide IP coverage
-- **AI-Ready Data:** Automatically formats extracted content for AI processing
-- **Dynamic Content:** Handles JavaScript-rendered content effortlessly
+Modify the Steve Schiffman script prompts in `voice.py` to adjust the conversation approach if needed.
 
-```javascript
-// Example MCP Server connection
-const SBR_CDP = 'wss://brd-customer-CUSTOMER_ID-zone-ZONE_NAME:PASSWORD@brd.superproxy.io:9222';
+## Support
 
-async function scrapeAgents() {
-    const browser = await pw.chromium.connectOverCDP(SBR_CDP);
-    const page = await browser.newPage();
-    await page.goto('https://www.realtor.com/realestateandhomes-search/Austin_TX/pg-1');
-    // Extract agent data...
-}
-```
+For questions or issues, contact Ato and Matt at Trout Mobile.
 
-## 📊 Scaling Strategies
+## Troubleshooting and Fixes
 
-Once your MVP is working, consider these scaling approaches:
+### Call Destination Issue
+We identified and fixed an issue where despite having the correct phone number in the database (3036426337), the system was actually calling a different number (720-488-7700).
 
-1. **Vertical expansion:** Target different industries (e-commerce, insurance, etc.)
-2. **Recurring revenue:** Convert one-time sales ($149) to subscriptions ($99/month)
-3. **Self-optimization:** Let the AI improve pitches based on call outcomes
+The fix involved modifying the `place_call` function in `backend/voice.py` to correctly use the intended phone number when making calls via Twilio.
 
-## ⚠️ Legal Compliance
+### Diagnostic Scripts
 
-This tool is designed with TCPA compliance in mind:
-- Each call opens with a clear disclosure
-- Provides opt-out options
-- Logs all interactions
+Several diagnostic and testing scripts were created:
 
-Always verify regulations in your region before automated calling.
+1. **check_logs.py** - Checks the database records for a specific lead
+2. **make_call.py** - Initial script to test making calls via the API
+3. **make_test_call.py** - Tests Twilio credentials directly 
+4. **check_call_status.py** - Verifies call destinations using Twilio API
+5. **fix_and_call.py** - Updates the database with the correct phone number and tests making calls
 
-## 🤝 Need Help?
+## System Configuration
 
-- Check the code examples in each file
-- Consult the API documentation for [Twilio](https://www.twilio.com/docs), [ElevenLabs](https://docs.elevenlabs.io/), [OpenAI](https://platform.openai.com/docs), and [Bright Data](https://brightdata.com/docs)
-- Open an issue on GitHub
+- Twilio account has a balance of $19.60 and valid credentials
+- The system is configured to call using the phone number: +17207800827
+- The callback URL is configured to use ngrok for webhook handling
 
----
+## Usage
 
-Built with ❤️ using Flask, React, and AI APIs
+To start the system:
+1. Run the backend server
+2. Set up ngrok for handling callbacks if testing locally
+3. Use the frontend to manage leads and initiate calls
+
+The system now correctly calls the intended phone number (3036426337) for appointment scheduling.
