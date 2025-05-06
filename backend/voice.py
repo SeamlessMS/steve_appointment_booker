@@ -204,8 +204,8 @@ def place_call(phone_number, script):
     """Place a call using Twilio"""
     config = get_config()
     
-    # TEMPORARY FIX: Force using the correct phone number
-    target_phone = "3036426337"  # Hardcoded for testing
+    # Use the phone number passed to the function
+    logger.info(f"Placing call to: {phone_number}")
     
     logger.info("Configuration details:")
     logger.info(f"TWILIO_ACCOUNT_SID: {config.get('TWILIO_ACCOUNT_SID', 'Not found')}")
@@ -239,7 +239,6 @@ def place_call(phone_number, script):
     try:
         # Place the call
         logger.info(f"Original phone_number: {phone_number}")
-        logger.info(f"Using target phone number: {target_phone}")
         logger.info(f"Using Twilio phone number: {config['TWILIO_PHONE_NUMBER']}")
         
         # URL encode the script parameter
@@ -248,20 +247,32 @@ def place_call(phone_number, script):
         status_url = f"{webhook_url}/webhook/status?lead_id={lead_id}"
         recording_url = f"{webhook_url}/webhook/recording?lead_id={lead_id}" if recording_enabled else None
         
+        # Create AMD status callback URL
+        amd_status_url = f"{webhook_url}/webhook/amd_status?lead_id={lead_id}"
+        
         logger.info(f"Voice URL: {voice_url}")
         logger.info(f"Status URL: {status_url}")
+        logger.info(f"AMD Status URL: {amd_status_url}")
         if recording_url:
             logger.info(f"Recording URL: {recording_url}")
         
         call = client.calls.create(
-            to=target_phone,  # Use the hardcoded number
+            to=phone_number,
             from_=config['TWILIO_PHONE_NUMBER'],
             url=voice_url,
             status_callback=status_url,
             status_callback_event=['completed', 'answered', 'busy', 'no-answer', 'failed'],
             record=recording_enabled,
             recording_status_callback=recording_url,
-            recording_channels="dual" if recording_enabled else None
+            recording_channels="dual" if recording_enabled else None,
+            # Add Answering Machine Detection parameters
+            machine_detection="DetectMessageEnd",  # Wait for the end of voicemail greeting before executing TwiML
+            async_amd=True,  # Use async AMD to avoid silence for humans
+            async_amd_status_callback=amd_status_url,  # AMD status callback URL
+            machine_detection_timeout=30,  # Maximum time to wait for AMD detection (seconds)
+            machine_detection_speech_threshold=2400,  # Duration threshold for considering speech to be from a machine (ms)
+            machine_detection_speech_end_threshold=1200,  # Silence duration after speech to consider the speech complete (ms)
+            machine_detection_silence_timeout=5000  # Initial silence duration before returning unknown (ms)
         )
         logger.info(f"Call placed successfully with SID: {call.sid}")
         return call.sid
@@ -270,7 +281,7 @@ def place_call(phone_number, script):
         raise
 
 # For Twilio webhook to handle voice conversation
-def get_voice_response(text, lead_data=None, history=None):
+def get_voice_response(text, lead_data=None, history=None, is_voicemail=False):
     """Generate voice response for Twilio"""
     # Create TwiML response
     response = VoiceResponse()
@@ -279,35 +290,84 @@ def get_voice_response(text, lead_data=None, history=None):
     config = get_config()
     use_elevenlabs = config.get('ELEVENLABS_API_KEY') and config.get('ELEVENLABS_VOICE_ID')
     
-    if use_elevenlabs:
-        try:
-            # Generate audio file
-            audio_file = elevenlabs_tts(text)
-            if audio_file and os.path.exists(audio_file):
-                # Get the full URL for the audio file
-                webhook_url = config.get('CALLBACK_URL', '').rstrip('/webhook')
-                audio_url = f"{webhook_url}/audio/{os.path.basename(audio_file)}"
-                response.play(audio_url)
-                logger.info(f"Using ElevenLabs audio: {audio_url}")
-            else:
-                logger.warning("Failed to generate ElevenLabs audio, falling back to Twilio TTS")
-                response.say(text)
-        except Exception as e:
-            logger.error(f"Error in voice response generation: {str(e)}")
-            response.say(text)
+    # If this is a voicemail, adjust the message to be more concise
+    if is_voicemail:
+        # For voicemail, use a more complete message that doesn't expect interaction
+        # Add a pause at the beginning to ensure we're past the greeting
+        response.pause(length=1)
+        
+        # Start with company name and purpose
+        voicemail_text = f"Hello, this is Steve from Seamless Mobile Services calling about mobile device management. "
+        
+        # Add the original script content, but shortened if needed
+        if len(text) > 300:  # If the script is too long, truncate it
+            voicemail_text += text[:300] + "..."
+        else:
+            voicemail_text += text
+            
+        # Add call-to-action and contact details
+        phone_number = config.get('TWILIO_PHONE_NUMBER', '')
+        # Format the phone number for better speech: "+1XXXXXXXXXX" to "XXX XXX XXXX"
+        if phone_number.startswith('+1') and len(phone_number) == 12:
+            formatted_number = f"{phone_number[2:5]} {phone_number[5:8]} {phone_number[8:12]}"
+        else:
+            formatted_number = phone_number
+            
+        voicemail_text += f" Please call us back at {formatted_number}."
+        voicemail_text += " Thank you and have a great day."
+        
+        if use_elevenlabs:
+            try:
+                # Generate audio file
+                audio_file = elevenlabs_tts(voicemail_text)
+                if audio_file and os.path.exists(audio_file):
+                    # Get the full URL for the audio file
+                    webhook_url = config.get('CALLBACK_URL', '').rstrip('/webhook')
+                    audio_url = f"{webhook_url}/audio/{os.path.basename(audio_file)}"
+                    response.play(audio_url)
+                    logger.info(f"Using ElevenLabs audio for voicemail: {audio_url}")
+                else:
+                    logger.warning("Failed to generate ElevenLabs audio for voicemail, falling back to Twilio TTS")
+                    response.say(voicemail_text)
+            except Exception as e:
+                logger.error(f"Error in voicemail voice generation: {str(e)}")
+                response.say(voicemail_text)
+        else:
+            # Use standard Twilio TTS
+            response.say(voicemail_text)
+        
+        # End the call after leaving the message
+        response.hangup()
     else:
-        # Use standard Twilio TTS
-        response.say(text)
-    
-    # Gather speech input
-    gather = Gather(
-        input='speech',
-        action='/webhook/response',
-        method='POST',
-        speechTimeout='auto',
-        enhanced='true'
-    )
-    response.append(gather)
+        if use_elevenlabs:
+            try:
+                # Generate audio file
+                audio_file = elevenlabs_tts(text)
+                if audio_file and os.path.exists(audio_file):
+                    # Get the full URL for the audio file
+                    webhook_url = config.get('CALLBACK_URL', '').rstrip('/webhook')
+                    audio_url = f"{webhook_url}/audio/{os.path.basename(audio_file)}"
+                    response.play(audio_url)
+                    logger.info(f"Using ElevenLabs audio: {audio_url}")
+                else:
+                    logger.warning("Failed to generate ElevenLabs audio, falling back to Twilio TTS")
+                    response.say(text)
+            except Exception as e:
+                logger.error(f"Error in voice response generation: {str(e)}")
+                response.say(text)
+        else:
+            # Use standard Twilio TTS
+            response.say(text)
+        
+        # Gather speech input
+        gather = Gather(
+            input='speech',
+            action='/webhook/response',
+            method='POST',
+            speechTimeout='auto',
+            enhanced='true'
+        )
+        response.append(gather)
     
     return str(response)
 

@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { callLead, manualCallLead, autoDialLeads, checkBusinessHours, updateLead, getCallLogs, addFollowUp } from '../api';
+import { callLead, manualCallLead, autoDialLeads, checkBusinessHours, updateLead, getCallLogs, addFollowUp, deleteLead, deleteLeads } from '../api';
 import axios from 'axios';
 import LeadHistoryModal from './LeadHistoryModal';
 
-const API_BASE = process.env.REACT_APP_API_BASE || 'http://localhost:5003/api';
+// Get API base from the imported functions (used in axios calls)
+const API_BASE = process.env.REACT_APP_API_BASE || 'http://localhost:5001/api';
 
 const STATUS_COLORS = {
   'Not Called': 'bg-gray-200 text-gray-700',
@@ -144,6 +145,80 @@ export default function LeadTable({ leads, onStatusChange }) {
         });
       }
       setTimeout(() => setNotification({ show: false, message: '', type: '' }), 5000);
+    }
+  };
+
+  const handleDeleteLeads = async () => {
+    if (selectedLeads.length === 0) {
+      setNotification({
+        show: true,
+        type: 'error',
+        message: 'Please select at least one lead to delete'
+      });
+      setTimeout(() => setNotification({ show: false, message: '', type: '' }), 5000);
+      return;
+    }
+
+    if (!window.confirm(`Are you sure you want to delete ${selectedLeads.length} lead(s)? This action cannot be undone.`)) {
+      return;
+    }
+
+    try {
+      await deleteLeads(selectedLeads);
+      setNotification({
+        show: true,
+        type: 'success',
+        message: `${selectedLeads.length} lead(s) deleted successfully`
+      });
+      setSelectedLeads([]);
+      onStatusChange(); // Refresh the leads list
+      setTimeout(() => setNotification({ show: false, message: '', type: '' }), 5000);
+    } catch (error) {
+      console.error("Error deleting leads:", error);
+      setNotification({
+        show: true,
+        type: 'error',
+        message: 'Error deleting leads: ' + (error.response?.data?.error || error.message)
+      });
+      setTimeout(() => setNotification({ show: false, message: '', type: '' }), 5000);
+    }
+  };
+
+  const handleDeleteLead = async (leadId) => {
+    if (!window.confirm("Are you sure you want to delete this lead? This action cannot be undone.")) {
+      return;
+    }
+
+    try {
+      setLoadingId(leadId);
+      await deleteLead(leadId);
+      setNotification({
+        show: true,
+        type: 'success',
+        message: 'Lead deleted successfully'
+      });
+      onStatusChange(); // Refresh the leads list
+      setTimeout(() => setNotification({ show: false, message: '', type: '' }), 5000);
+    } catch (error) {
+      console.error("Error deleting lead:", error);
+      setNotification({
+        show: true,
+        type: 'error',
+        message: 'Error deleting lead: ' + (error.response?.data?.error || error.message)
+      });
+      setTimeout(() => setNotification({ show: false, message: '', type: '' }), 5000);
+    } finally {
+      setLoadingId(null);
+    }
+  };
+  
+  const toggleSelectAll = () => {
+    if (selectedLeads.length === leads.length) {
+      // If all leads are selected, deselect all
+      setSelectedLeads([]);
+    } else {
+      // Otherwise, select all leads
+      setSelectedLeads(leads.map(lead => lead.id));
     }
   };
 
@@ -347,9 +422,9 @@ export default function LeadTable({ leads, onStatusChange }) {
       )}
 
       <div className="mb-4 flex justify-between items-center">
-        <div>
+        <div className="flex space-x-2">
           <button
-            className={`px-4 py-2 rounded mr-2 ${
+            className={`px-4 py-2 rounded ${
               withinBusinessHours 
                 ? 'bg-green-500 text-white hover:bg-green-600' 
                 : 'bg-gray-300 text-gray-700 cursor-not-allowed'
@@ -359,7 +434,16 @@ export default function LeadTable({ leads, onStatusChange }) {
           >
             Auto-Dial Selected Leads
           </button>
-          <span className="text-sm">
+          
+          <button
+            className="px-4 py-2 rounded bg-red-500 text-white hover:bg-red-600 disabled:opacity-50"
+            onClick={handleDeleteLeads}
+            disabled={selectedLeads.length === 0}
+          >
+            Delete Selected Leads
+          </button>
+          
+          <span className="ml-2 text-sm flex items-center">
             {withinBusinessHours 
               ? '✅ Within business hours' 
               : `⚠️ Outside business hours (${businessHoursInfo.days || 'M-F'}, ${businessHoursInfo.start || '9:30 AM'}-${businessHoursInfo.end || '4:00 PM'} ${businessHoursInfo.timezone || 'MT'})`}
@@ -376,13 +460,7 @@ export default function LeadTable({ leads, onStatusChange }) {
             <th className="px-4 py-2 w-10">
               <input 
                 type="checkbox" 
-                onChange={(e) => {
-                  if (e.target.checked) {
-                    setSelectedLeads(leads.map(lead => lead.id));
-                  } else {
-                    setSelectedLeads([]);
-                  }
-                }}
+                onChange={toggleSelectAll}
                 checked={selectedLeads.length === leads.length && leads.length > 0}
               />
             </th>
@@ -434,7 +512,7 @@ export default function LeadTable({ leads, onStatusChange }) {
                   Manual Call
                 </button>
                 <button
-                  className="bg-yellow-500 text-white px-3 py-1 rounded hover:bg-yellow-600 disabled:opacity-50"
+                  className="bg-green-500 text-white px-3 py-1 rounded hover:bg-green-600 disabled:opacity-50"
                   disabled={loadingId === lead.id}
                   onClick={() => openQualifyModal(lead)}
                 >
@@ -442,29 +520,39 @@ export default function LeadTable({ leads, onStatusChange }) {
                 </button>
                 <button
                   className="bg-purple-500 text-white px-3 py-1 rounded hover:bg-purple-600 disabled:opacity-50"
-                  disabled={loadingId === lead.id || lead.qualification_status !== 'Qualified'}
+                  disabled={loadingId === lead.id}
                   onClick={() => openAppointmentModal(lead)}
                 >
                   Book
                 </button>
                 <button
-                  className="bg-cyan-500 text-white px-3 py-1 rounded hover:bg-cyan-600 disabled:opacity-50"
-                  disabled={loadingId === lead.id || lead.status === 'Appointment Set'}
+                  className="bg-yellow-500 text-white px-3 py-1 rounded hover:bg-yellow-600 disabled:opacity-50"
+                  disabled={loadingId === lead.id}
                   onClick={() => openFollowUpModal(lead)}
                 >
                   Follow-up
                 </button>
                 <button
-                  className="bg-green-500 text-white px-3 py-1 rounded hover:bg-green-600"
+                  className="bg-blue-500 text-white px-3 py-1 rounded hover:bg-blue-600 disabled:opacity-50"
+                  disabled={loadingId === lead.id}
                   onClick={() => handleTranscript(lead)}
                 >
                   Transcript
                 </button>
                 <button
-                  className="bg-indigo-500 text-white px-3 py-1 rounded hover:bg-indigo-600"
+                  className="bg-gray-300 text-gray-700 px-3 py-1 rounded hover:bg-gray-400 disabled:opacity-50"
+                  disabled={loadingId === lead.id}
                   onClick={() => openHistoryModal(lead)}
                 >
                   History
+                </button>
+                <button
+                  className="bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600 disabled:opacity-50"
+                  disabled={loadingId === lead.id}
+                  onClick={() => handleDeleteLead(lead.id)}
+                  title="Delete this lead"
+                >
+                  Delete
                 </button>
               </td>
             </tr>

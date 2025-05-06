@@ -25,6 +25,9 @@ var/
 *.egg-info/
 .installed.cfg
 *.egg
+venv/
+ENV/
+.pytest_cache/
 
 # Frontend dependencies and build artifacts
 node_modules/
@@ -100,4 +103,21 @@ ngrok.exe
 
 # Old scripts
 restart.bat
-restart.ps1 
+restart.ps1
+
+# Frontend
+frontend/build
+frontend/dist
+frontend/.env.local
+frontend/.env.development.local
+frontend/.env.test.local
+frontend/.env.production.local
+
+# Backend
+backend/audio_files/
+backend/*.db
+backend/*.db-journal
+backend/.env
+
+# Project specific
+audio_files/ 

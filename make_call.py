@@ -3,6 +3,7 @@ import json
 import sys
 import os
 import sqlite3
+import argparse
 
 def init_db():
     db_path = 'backend/database.db'
@@ -56,11 +57,27 @@ def init_db():
     return conn
 
 def main():
+    # Parse command line arguments
+    parser = argparse.ArgumentParser(description='Make a call to a specified phone number')
+    parser.add_argument('--phone', type=str, help='Phone number to call (format: 1234567890)')
+    args = parser.parse_args()
+    
+    # Get the phone number
+    phone_number = args.phone
+    
+    # Ask for phone number if not provided
+    if not phone_number:
+        print("Please enter a phone number to call (or press Enter to exit):")
+        phone_number = input().strip()
+        
+    if not phone_number:
+        print("No phone number provided. Exiting.")
+        return
+    
+    print(f"Using phone number: {phone_number}")
+    
     conn = init_db()
     cursor = conn.cursor()
-    
-    # Get the test phone number to call
-    phone_number = "3036426337"  # Hard-coded for this test
     
     # Find the lead with the phone number
     cursor.execute("SELECT id, phone FROM leads WHERE phone = ?", (phone_number,))

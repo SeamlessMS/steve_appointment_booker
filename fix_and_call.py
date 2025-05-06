@@ -3,10 +3,15 @@ import json
 import sys
 import os
 import sqlite3
+import argparse
 
-def fix_phone_number():
+def fix_phone_number(target_phone=None):
     db_path = 'backend/database.db'
-    target_phone = "3036426337"  # The phone number you want to call
+    
+    # Use the provided phone number or prompt for one if not provided
+    if not target_phone:
+        print("No phone number provided via command line.")
+        return False
     
     if not os.path.exists(db_path):
         print(f"Database file not found: {db_path}")
@@ -66,8 +71,22 @@ def make_call_to_api():
         return False
 
 def main():
+    # Set up argument parsing
+    parser = argparse.ArgumentParser(description='Fix phone number in database and make test call')
+    parser.add_argument('--phone', type=str, help='Phone number to use for the test call (format: 1234567890)')
+    args = parser.parse_args()
+    
+    # Get phone number from arguments or use default if debugging
+    target_phone = args.phone
+    
+    if not target_phone:
+        print("Please provide a phone number with --phone")
+        print("Example: python fix_and_call.py --phone 1234567890")
+        return
+    
+    print(f"Using phone number: {target_phone}")
     print("Step 1: Fixing phone number in database...")
-    if fix_phone_number():
+    if fix_phone_number(target_phone):
         print("\nStep 2: Making call via API...")
         make_call_to_api()
     else:

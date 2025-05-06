@@ -1,8 +1,28 @@
 import sqlite3
 import os
 import sys
+import argparse
 
 def main():
+    # Parse command line arguments
+    parser = argparse.ArgumentParser(description='Check call logs for a specific phone number')
+    parser.add_argument('--phone', type=str, help='Phone number to check (format: 1234567890)')
+    args = parser.parse_args()
+    
+    # Get the phone number
+    phone_number = args.phone
+    
+    # Ask for phone number if not provided
+    if not phone_number:
+        print("Please enter a phone number to check logs for (or press Enter to exit):")
+        phone_number = input().strip()
+        
+    if not phone_number:
+        print("No phone number provided. Exiting.")
+        return
+    
+    print(f"Checking logs for phone number: {phone_number}")
+    
     db_path = 'backend/database.db'
     
     # Make sure the database exists
@@ -14,7 +34,7 @@ def main():
     cursor = conn.cursor()
     
     # First check if the lead exists
-    cursor.execute("SELECT * FROM leads WHERE phone = '3036426337'")
+    cursor.execute("SELECT * FROM leads WHERE phone = ?", (phone_number,))
     lead = cursor.fetchone()
     
     if not lead:

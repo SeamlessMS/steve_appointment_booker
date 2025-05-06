@@ -14,39 +14,44 @@ def get_db():
         conn.close()
 
 def init_db():
+    """Initialize the database with required tables"""
     with get_db() as conn:
-        c = conn.cursor()
-        c.execute('''
+        # Create leads table
+        conn.execute('''
             CREATE TABLE IF NOT EXISTS leads (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 name TEXT,
                 phone TEXT,
-                category TEXT,
-                address TEXT,
-                website TEXT,
-                status TEXT DEFAULT 'Not Called',
-                employee_count INTEGER DEFAULT 0,
-                uses_mobile_devices TEXT DEFAULT 'Unknown',
+                email TEXT,
+                company TEXT,
                 industry TEXT,
-                city TEXT,
-                state TEXT,
+                category TEXT,
+                status TEXT DEFAULT 'Not Called',
+                qualification_status TEXT DEFAULT 'Not Qualified',
+                uses_mobile_devices TEXT DEFAULT 'Unknown',
+                employee_count INTEGER DEFAULT 0,
                 appointment_date TEXT,
                 appointment_time TEXT,
-                qualification_status TEXT DEFAULT 'Not Qualified',
-                notes TEXT
+                notes TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         ''')
-        c.execute('''
+        
+        # Create call_logs table
+        conn.execute('''
             CREATE TABLE IF NOT EXISTS call_logs (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 lead_id INTEGER,
                 call_status TEXT,
                 transcript TEXT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (lead_id) REFERENCES leads(id)
+                FOREIGN KEY (lead_id) REFERENCES leads (id)
             )
         ''')
-        c.execute('''
+        
+        # Create appointments table
+        conn.execute('''
             CREATE TABLE IF NOT EXISTS appointments (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 lead_id INTEGER,
@@ -54,10 +59,42 @@ def init_db():
                 time TEXT,
                 status TEXT DEFAULT 'Scheduled',
                 medium TEXT DEFAULT 'Phone',
+                notes TEXT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (lead_id) REFERENCES leads(id)
+                FOREIGN KEY (lead_id) REFERENCES leads (id)
             )
         ''')
+        
+        # Create follow_ups table
+        conn.execute('''
+            CREATE TABLE IF NOT EXISTS follow_ups (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                lead_id INTEGER,
+                scheduled_time TIMESTAMP,
+                priority INTEGER DEFAULT 5,
+                reason TEXT,
+                status TEXT DEFAULT 'Pending',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (lead_id) REFERENCES leads (id)
+            )
+        ''')
+        
+        # Create industry_patterns table
+        conn.execute('''
+            CREATE TABLE IF NOT EXISTS industry_patterns (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                industry TEXT,
+                pattern_type TEXT,
+                pattern_key TEXT,
+                pattern_value TEXT,
+                success_count INTEGER DEFAULT 0,
+                last_used TIMESTAMP,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(industry, pattern_type, pattern_key)
+            )
+        ''')
+        
         conn.commit()
         
         # Check if new columns exist and add them if not

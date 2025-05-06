@@ -6,6 +6,8 @@ import tempfile
 from config import get_config
 import logging
 import random
+import requests
+from bs4 import BeautifulSoup
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -202,17 +204,16 @@ def estimate_employee_count(business):
 def extract_city_state(address):
     """Extract city and state from an address string"""
     if not address:
-        return "Unknown", "Unknown"
+        return None, None
     
-    # Simple implementation - would need to be more robust in production
     parts = address.split(',')
     if len(parts) >= 2:
         city = parts[-2].strip()
         state_zip = parts[-1].strip().split()
-        state = state_zip[0] if state_zip else "Unknown"
+        state = state_zip[0] if state_zip else None
         return city, state
     
-    return "Unknown", "Unknown"
+    return None, None
 
 def generate_dummy_businesses(location="Denver, CO", industry="Plumbing", limit=30):
     """Generate dummy business data for testing"""
@@ -251,6 +252,152 @@ def generate_dummy_businesses(location="Denver, CO", industry="Plumbing", limit=
     
     return businesses
 
+def scrape_with_brightdata(search_url, zone):
+    """Scrape content using Bright Data API directly"""
+    config = get_config()
+    api_token = config['BRIGHTDATA_API_TOKEN']
+    
+    if not api_token:
+        logger.warning("No Bright Data API token provided.")
+        return None
+    
+    # Define the request
+    url = "https://api.brightdata.com/request"
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {api_token}"
+    }
+    payload = {
+        "zone": zone,
+        "url": search_url,
+        "format": "html"
+    }
+    
+    try:
+        # Make the request
+        response = requests.post(url, headers=headers, json=payload)
+        if response.status_code == 200:
+            return response.text
+        else:
+            logger.error(f"Bright Data API error: {response.status_code} - {response.text}")
+            return None
+    except Exception as e:
+        logger.error(f"Error using Bright Data API: {str(e)}")
+        return None
+
+def scrape_google_businesses(location="Denver, CO", industry="Plumbing", limit=30):
+    """Scrape businesses from Google using Bright Data"""
+    config = get_config()
+    zone = config['BRIGHTDATA_WEB_UNLOCKER_ZONE']
+    
+    # Format the search URL for Google Maps
+    search_query = f"{industry} businesses in {location}".replace(" ", "+")
+    search_url = f"https://www.google.com/maps/search/{search_query}/"
+    
+    # Use Bright Data to get the content
+    content = scrape_with_brightdata(search_url, zone)
+    if not content:
+        logger.warning("Failed to get content from Bright Data. Using dummy data.")
+        return generate_dummy_businesses(location, industry, limit)
+    
+    # Process the HTML content - this is a simplified example
+    soup = BeautifulSoup(content, 'html.parser')
+    
+    # Extract business info - this will need to be customized based on actual Google Maps HTML structure
+    businesses = []
+    business_elements = soup.select('.section-result')[:limit]  # Adjust selector based on actual HTML
+    
+    if not business_elements:
+        logger.warning("No business elements found in the scraped content. Using dummy data.")
+        return generate_dummy_businesses(location, industry, limit)
+    
+    for element in business_elements:
+        try:
+            name_elem = element.select_one('.section-result-title')
+            address_elem = element.select_one('.section-result-location')
+            phone_elem = element.select_one('.section-result-phone')
+            
+            business = {
+                'name': name_elem.text.strip() if name_elem else f"Unknown {industry} Business",
+                'phone': phone_elem.text.strip() if phone_elem else "N/A",
+                'category': industry,
+                'address': address_elem.text.strip() if address_elem else location,
+                'website': '',  # Would need more processing to extract
+                'employee_count': random.randint(5, 30),  # Hard to extract this info
+            }
+            
+            city, state = extract_city_state(business['address'])
+            business['city'] = city or ""
+            business['state'] = state or ""
+            business['industry'] = industry
+            
+            businesses.append(business)
+        except Exception as e:
+            logger.error(f"Error extracting business info: {str(e)}")
+    
+    # If we couldn't extract any businesses, use dummy data
+    if not businesses:
+        logger.warning("Failed to extract business info. Using dummy data.")
+        return generate_dummy_businesses(location, industry, limit)
+    
+    return businesses
+
+def scrape_yelp_businesses(location="Denver, CO", industry="Plumbing", limit=30):
+    """Scrape businesses from Yelp using Bright Data"""
+    config = get_config()
+    zone = config['BRIGHTDATA_WEB_UNLOCKER_ZONE']
+    
+    # Format the search URL for Yelp
+    search_query = f"{industry} in {location}".replace(" ", "+")
+    search_url = f"https://www.yelp.com/search?find_desc={search_query}"
+    
+    # Use Bright Data to get the content
+    content = scrape_with_brightdata(search_url, zone)
+    if not content:
+        logger.warning("Failed to get content from Bright Data. Using dummy data.")
+        return generate_dummy_businesses(location, industry, limit)
+    
+    # Process the HTML content
+    soup = BeautifulSoup(content, 'html.parser')
+    
+    # Extract business info - this will need to be customized based on actual Yelp HTML structure
+    businesses = []
+    business_elements = soup.select('li.border-color--default__09f24__NPAKY')[:limit]  # Adjust selector for actual Yelp HTML
+    
+    if not business_elements:
+        logger.warning("No business elements found in the scraped content. Using dummy data.")
+        return generate_dummy_businesses(location, industry, limit)
+    
+    for element in business_elements:
+        try:
+            name_elem = element.select_one('a.css-19v1rkv')
+            address_elem = element.select_one('address.css-e81eai')
+            
+            business = {
+                'name': name_elem.text.strip() if name_elem else f"Unknown {industry} Business",
+                'phone': "N/A",  # Often not available in search results
+                'category': industry,
+                'address': address_elem.text.strip() if address_elem else location,
+                'website': '',  # Would need to follow links to extract
+                'employee_count': random.randint(5, 30),  # Hard to extract this info
+            }
+            
+            city, state = extract_city_state(business['address'])
+            business['city'] = city or ""
+            business['state'] = state or ""
+            business['industry'] = industry
+            
+            businesses.append(business)
+        except Exception as e:
+            logger.error(f"Error extracting business info: {str(e)}")
+    
+    # If we couldn't extract any businesses, use dummy data
+    if not businesses:
+        logger.warning("Failed to extract business info. Using dummy data.")
+        return generate_dummy_businesses(location, industry, limit)
+    
+    return businesses
+
 def scrape_business_leads(location="Denver, CO", industry="Plumbing", limit=30):
     """Scrape business leads from various sources"""
     if ',' not in location:
@@ -260,22 +407,25 @@ def scrape_business_leads(location="Denver, CO", industry="Plumbing", limit=30):
     
     # If Bright Data API token is available, use the real scrapers
     if config['BRIGHTDATA_API_TOKEN']:
-        # Scrape from multiple sources and combine results
-        businesses = []
-        
-        # Try to get half from Google Maps/Directories and half from Yelp
+        # Try to get half from Google Maps and half from Yelp
         half_limit = limit // 2
-        businesses.extend(scrape_businesses(location, industry, half_limit))
-        businesses.extend(scrape_yelp_businesses(location, industry, half_limit))
         
-        # If we didn't get enough, try to fill in
-        if len(businesses) < limit:
-            # Try to get more from the first source
-            more_businesses = scrape_businesses(location, industry, limit - len(businesses))
-            businesses.extend(more_businesses)
-        
-        # Limit to the requested number
-        return businesses[:limit]
+        try:
+            # First try Google Maps
+            businesses = scrape_google_businesses(location, industry, half_limit)
+            
+            # Then try Yelp to get the rest
+            if len(businesses) < limit:
+                yelp_businesses = scrape_yelp_businesses(location, industry, limit - len(businesses))
+                businesses.extend(yelp_businesses)
+            
+            # Limit to the requested number
+            return businesses[:limit]
+            
+        except Exception as e:
+            logger.error(f"Error scraping businesses: {str(e)}")
+            return generate_dummy_businesses(location, industry, limit)
     else:
         # Use dummy data if no Bright Data API token
+        logger.warning("No Bright Data API token available. Using dummy data.")
         return generate_dummy_businesses(location, industry, limit)

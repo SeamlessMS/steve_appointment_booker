@@ -222,25 +222,56 @@ For questions or issues, contact Ato and Matt at Trout Mobile.
 ## Troubleshooting and Fixes
 
 ### Call Destination Issue
-We identified and fixed an issue where despite having the correct phone number in the database (3036426337), the system was actually calling a different number (720-488-7700).
+We identified and fixed an issue where despite having the correct phone number in the database, the system was incorrectly calling a different number.
 
 The fix involved modifying the `place_call` function in `backend/voice.py` to correctly use the intended phone number when making calls via Twilio.
+
+### Test Suite
+
+The system includes a comprehensive test suite located in the `tests` directory:
+
+1. **tests/test_system.py** - Complete system test that checks all components
+2. **tests/test_conversation_flow.py** - Tests the AI conversation logic
+3. **tests/test_conversation.py** - Tests the full conversation with a test lead
+4. **tests/test_twilio_call.py** - Tests the Twilio credentials and makes a test call
+
+To run all tests:
+```
+python -m tests.run_tests
+```
+
+To run a specific test:
+```
+python -m tests.run_tests --test system
+```
+
+To run a test with a phone number for testing calls:
+```
+python -m tests.run_tests --test system --phone YOUR_PHONE_NUMBER
+```
 
 ### Diagnostic Scripts
 
 Several diagnostic and testing scripts were created:
 
 1. **check_logs.py** - Checks the database records for a specific lead
-2. **make_call.py** - Initial script to test making calls via the API
-3. **make_test_call.py** - Tests Twilio credentials directly 
-4. **check_call_status.py** - Verifies call destinations using Twilio API
-5. **fix_and_call.py** - Updates the database with the correct phone number and tests making calls
+2. **make_call.py** - Initial script to test making calls via the API 
+3. **check_call_status.py** - Verifies call destinations using Twilio API
+4. **fix_and_call.py** - Updates the database with the correct phone number and tests making calls
 
 ## System Configuration
 
-- Twilio account has a balance of $19.60 and valid credentials
-- The system is configured to call using the phone number: +17207800827
+- Twilio account has sufficient balance and valid credentials
 - The callback URL is configured to use ngrok for webhook handling
+
+## Development Notes
+
+- The ngrok executable (`ngrok.exe`) is excluded from git via the `.gitignore` file
+- To set up a local development environment, you'll need to:
+  1. Download ngrok from https://ngrok.com/download
+  2. Place the ngrok executable in the project root (it will be ignored by git)
+  3. Use ngrok to create a tunnel for the webhook: `ngrok http 5001`
+  4. Update the `CALLBACK_URL` in your config.json with the ngrok URL
 
 ## Usage
 
