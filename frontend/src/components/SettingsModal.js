@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 
-const API_BASE = process.env.REACT_APP_API_BASE || 'http://localhost:5002/api';
+const API_BASE = process.env.REACT_APP_API_BASE || 'http://localhost:5003/api';
 
 export default function SettingsModal({ open, onClose, onSave }) {
   const [config, setConfig] = useState({
@@ -13,13 +13,18 @@ export default function SettingsModal({ open, onClose, onSave }) {
     LLM_API_KEY: '',
     BRIGHTDATA_API_TOKEN: '',
     BRIGHTDATA_WEB_UNLOCKER_ZONE: '',
-    ZOHO_REFRESH_TOKEN: '',
+    ZOHO_ORG_ID: '',
     ZOHO_CLIENT_ID: '',
     ZOHO_CLIENT_SECRET: '',
+    ZOHO_REFRESH_TOKEN: '',
+    ZOHO_DEPARTMENT_ID: '',
     CALLBACK_URL: '',
+    TEST_MODE: true
   });
   const [loading, setLoading] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [learningDays, setLearningDays] = useState(30);
+  const [learningStatus, setLearningStatus] = useState({ message: '', visible: false });
 
   useEffect(() => {
     if (open) {
@@ -30,14 +35,41 @@ export default function SettingsModal({ open, onClose, onSave }) {
   const handleChange = (e) => {
     setConfig({ ...config, [e.target.name]: e.target.value });
   };
+  
+  const handleToggleChange = (e) => {
+    setConfig({ ...config, [e.target.name]: e.target.checked });
+  };
 
   const handleSave = async () => {
     setLoading(true);
     await axios.post(`${API_BASE}/config`, config);
     setLoading(false);
     setSaved(true);
-    if (onSave) onSave();
+    if (onSave) onSave(config);
     setTimeout(() => setSaved(false), 1500);
+  };
+  
+  const triggerLearning = async () => {
+    setLearningStatus({ message: 'Analyzing successful conversations...', visible: true });
+    try {
+      const response = await axios.post(`${API_BASE}/analytics/learn`, { days: learningDays });
+      setLearningStatus({ 
+        message: `Success! ${response.data.message || 'Learning process completed successfully.'}`, 
+        visible: true,
+        isError: false
+      });
+    } catch (error) {
+      setLearningStatus({ 
+        message: `Error: ${error.response?.data?.message || 'Could not complete learning process.'}`, 
+        visible: true,
+        isError: true
+      });
+    }
+    
+    // Hide message after 5 seconds
+    setTimeout(() => {
+      setLearningStatus(prev => ({ ...prev, visible: false }));
+    }, 5000);
   };
 
   if (!open) return null;
@@ -48,6 +80,56 @@ export default function SettingsModal({ open, onClose, onSave }) {
         <h2 className="text-lg font-bold mb-4">API Key Settings</h2>
         
         <div className="space-y-4">
+          <div className="border-b pb-4">
+            <h3 className="font-medium mb-2">System Mode</h3>
+            <div className="flex items-center space-x-2">
+              <input 
+                type="checkbox" 
+                id="test_mode_toggle"
+                name="TEST_MODE"
+                checked={config.TEST_MODE}
+                onChange={handleToggleChange}
+                className="h-5 w-5"
+              />
+              <label htmlFor="test_mode_toggle" className="font-medium">
+                Test Mode {config.TEST_MODE ? '(Enabled)' : '(Disabled)'}
+              </label>
+            </div>
+            <p className="text-sm text-gray-500 mt-1">
+              When enabled, calls will be simulated without using external APIs or making real phone calls.
+            </p>
+          </div>
+          
+          <div className="border-b pb-4">
+            <h3 className="font-medium mb-2">System Learning</h3>
+            <p className="text-sm text-gray-600 mb-2">
+              Steve can learn from successful conversations to improve future calls.
+            </p>
+            <div className="flex items-center space-x-2 mb-2">
+              <label className="text-sm">Analyze last</label>
+              <input 
+                type="number" 
+                min="7"
+                max="365"
+                value={learningDays}
+                onChange={(e) => setLearningDays(parseInt(e.target.value))}
+                className="w-16 border p-1 rounded"
+              />
+              <label className="text-sm">days of successful calls</label>
+            </div>
+            <button
+              className="bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700 text-sm"
+              onClick={triggerLearning}
+            >
+              Start Learning Process
+            </button>
+            {learningStatus.visible && (
+              <div className={`mt-2 text-sm p-2 rounded ${learningStatus.isError ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'}`}>
+                {learningStatus.message}
+              </div>
+            )}
+          </div>
+          
           <div>
             <h3 className="font-medium mb-2">Twilio Voice Settings</h3>
             <div className="space-y-2">
@@ -78,9 +160,11 @@ export default function SettingsModal({ open, onClose, onSave }) {
           <div>
             <h3 className="font-medium mb-2">Zoho CRM Integration</h3>
             <div className="space-y-2">
+              <input name="ZOHO_ORG_ID" value={config.ZOHO_ORG_ID} onChange={handleChange} placeholder="Zoho Organization ID" className="w-full border p-2 rounded" />
               <input name="ZOHO_CLIENT_ID" value={config.ZOHO_CLIENT_ID} onChange={handleChange} placeholder="Zoho Client ID" className="w-full border p-2 rounded" />
               <input name="ZOHO_CLIENT_SECRET" value={config.ZOHO_CLIENT_SECRET} onChange={handleChange} placeholder="Zoho Client Secret" className="w-full border p-2 rounded" />
               <input name="ZOHO_REFRESH_TOKEN" value={config.ZOHO_REFRESH_TOKEN} onChange={handleChange} placeholder="Zoho Refresh Token" className="w-full border p-2 rounded" />
+              <input name="ZOHO_DEPARTMENT_ID" value={config.ZOHO_DEPARTMENT_ID} onChange={handleChange} placeholder="Zoho Department ID" className="w-full border p-2 rounded" />
             </div>
           </div>
         </div>

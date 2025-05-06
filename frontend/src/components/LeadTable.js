@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
-import { callLead, updateLead, getCallLogs } from '../api';
+import React, { useState, useEffect } from 'react';
+import { callLead, manualCallLead, autoDialLeads, checkBusinessHours, updateLead, getCallLogs, addFollowUp } from '../api';
 import axios from 'axios';
+import LeadHistoryModal from './LeadHistoryModal';
 
-const API_BASE = process.env.REACT_APP_API_BASE || 'http://localhost:5002/api';
+const API_BASE = process.env.REACT_APP_API_BASE || 'http://localhost:5003/api';
 
 const STATUS_COLORS = {
   'Not Called': 'bg-gray-200 text-gray-700',
@@ -21,7 +22,13 @@ export default function LeadTable({ leads, onStatusChange }) {
   const [transcript, setTranscript] = useState(null);
   const [showQualifyModal, setShowQualifyModal] = useState(false);
   const [showAppointmentModal, setShowAppointmentModal] = useState(false);
+  const [showFollowUpModal, setShowFollowUpModal] = useState(false);
+  const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [selectedLead, setSelectedLead] = useState(null);
+  const [withinBusinessHours, setWithinBusinessHours] = useState(true);
+  const [businessHoursInfo, setBusinessHoursInfo] = useState({});
+  const [selectedLeads, setSelectedLeads] = useState([]);
+  const [notification, setNotification] = useState({ show: false, message: '', type: '' });
   const [qualificationData, setQualificationData] = useState({
     qualified: false,
     uses_mobile_devices: 'Unknown',
@@ -33,13 +40,64 @@ export default function LeadTable({ leads, onStatusChange }) {
     time: '',
     medium: 'Phone'
   });
+  const [followUpData, setFollowUpData] = useState({
+    scheduled_time: '',
+    priority: 5,
+    reason: '',
+    notes: ''
+  });
   const [availableTimes, setAvailableTimes] = useState([]);
+
+  useEffect(() => {
+    // Check business hours when component mounts
+    checkBusinessHours()
+      .then(data => {
+        setWithinBusinessHours(data.within_business_hours);
+        setBusinessHoursInfo(data.business_hours);
+      })
+      .catch(error => {
+        console.error("Error checking business hours:", error);
+        setWithinBusinessHours(false);
+      });
+  }, []);
 
   const handleCall = async (lead) => {
     setLoadingId(lead.id);
-    await callLead(lead.id);
-    onStatusChange();
-    setLoadingId(null);
+    try {
+      await callLead(lead.id);
+      onStatusChange();
+    } catch (error) {
+      // Show error notification if outside business hours
+      if (error.response && error.response.status === 400) {
+        setNotification({
+          show: true,
+          type: 'error',
+          message: error.response.data.message || 'Cannot call outside business hours'
+        });
+        // Hide after 5 seconds
+        setTimeout(() => setNotification({ show: false, message: '', type: '' }), 5000);
+      }
+    } finally {
+      setLoadingId(null);
+    }
+  };
+
+  const handleManualCall = async (lead) => {
+    setLoadingId(lead.id);
+    try {
+      await manualCallLead(lead.id);
+      onStatusChange();
+    } catch (error) {
+      console.error("Error making manual call:", error);
+      setNotification({
+        show: true,
+        type: 'error',
+        message: 'Error making manual call'
+      });
+      setTimeout(() => setNotification({ show: false, message: '', type: '' }), 5000);
+    } finally {
+      setLoadingId(null);
+    }
   };
 
   const handleClose = async (lead) => {
@@ -47,6 +105,54 @@ export default function LeadTable({ leads, onStatusChange }) {
     await updateLead(lead.id, { status: 'Completed' });
     onStatusChange();
     setLoadingId(null);
+  };
+
+  const handleAutoDialer = async () => {
+    if (selectedLeads.length === 0) {
+      setNotification({
+        show: true,
+        type: 'error',
+        message: 'Please select at least one lead to auto-dial'
+      });
+      setTimeout(() => setNotification({ show: false, message: '', type: '' }), 5000);
+      return;
+    }
+
+    try {
+      const response = await autoDialLeads(selectedLeads);
+      onStatusChange();
+      setNotification({
+        show: true,
+        type: 'success',
+        message: `Auto-dialer started for ${selectedLeads.length} leads`
+      });
+      setTimeout(() => setNotification({ show: false, message: '', type: '' }), 5000);
+      setSelectedLeads([]);
+    } catch (error) {
+      // Show error message if outside business hours
+      if (error.response && error.response.status === 400) {
+        setNotification({
+          show: true,
+          type: 'error',
+          message: error.response.data.message || 'Auto-dialer can only be used during business hours'
+        });
+      } else {
+        setNotification({
+          show: true,
+          type: 'error',
+          message: 'Error starting auto-dialer'
+        });
+      }
+      setTimeout(() => setNotification({ show: false, message: '', type: '' }), 5000);
+    }
+  };
+
+  const toggleLeadSelection = (leadId) => {
+    if (selectedLeads.includes(leadId)) {
+      setSelectedLeads(selectedLeads.filter(id => id !== leadId));
+    } else {
+      setSelectedLeads([...selectedLeads, leadId]);
+    }
   };
 
   const handleTranscript = async (lead) => {
@@ -150,11 +256,136 @@ export default function LeadTable({ leads, onStatusChange }) {
     }
   };
 
+  const openFollowUpModal = (lead) => {
+    setSelectedLead(lead);
+    
+    // Default to tomorrow at 10 AM
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    tomorrow.setHours(10, 0, 0, 0);
+    const formattedDateTime = tomorrow.toISOString().slice(0, 16); // Format as YYYY-MM-DDTHH:MM
+    
+    setFollowUpData({
+      scheduled_time: formattedDateTime,
+      priority: 5,
+      reason: `Follow-up with ${lead.name}`,
+      notes: ''
+    });
+    
+    setShowFollowUpModal(true);
+  };
+
+  const closeFollowUpModal = () => {
+    setShowFollowUpModal(false);
+    setSelectedLead(null);
+  };
+
+  const saveFollowUp = async () => {
+    if (!selectedLead) return;
+    
+    setLoadingId(selectedLead.id);
+    
+    try {
+      // Convert local datetime to SQLite format (YYYY-MM-DD HH:MM:SS)
+      const scheduledDate = new Date(followUpData.scheduled_time);
+      const formattedTime = scheduledDate.toISOString().replace('T', ' ').substring(0, 19);
+      
+      await addFollowUp({
+        lead_id: selectedLead.id,
+        scheduled_time: formattedTime,
+        priority: followUpData.priority,
+        reason: followUpData.reason,
+        notes: followUpData.notes
+      });
+      
+      onStatusChange();
+      closeFollowUpModal();
+      
+      // Show success notification
+      setNotification({
+        show: true,
+        message: `Follow-up scheduled for ${selectedLead.name}`,
+        type: 'success'
+      });
+      
+      // Hide notification after 3 seconds
+      setTimeout(() => {
+        setNotification({ show: false, message: '', type: '' });
+      }, 3000);
+      
+    } catch (error) {
+      console.error("Error scheduling follow-up:", error);
+      setNotification({
+        show: true,
+        message: `Error scheduling follow-up: ${error.message}`,
+        type: 'error'
+      });
+      
+      // Hide notification after 5 seconds
+      setTimeout(() => {
+        setNotification({ show: false, message: '', type: '' });
+      }, 5000);
+    } finally {
+      setLoadingId(null);
+    }
+  };
+
+  const openHistoryModal = (lead) => {
+    setSelectedLead(lead);
+    setShowHistoryModal(true);
+  };
+
   return (
     <div>
+      {notification.show && (
+        <div className={`mb-4 p-3 rounded ${
+          notification.type === 'success' ? 'bg-green-100 text-green-800 border border-green-200' 
+          : 'bg-red-100 text-red-800 border border-red-200'
+        }`}>
+          {notification.message}
+        </div>
+      )}
+
+      <div className="mb-4 flex justify-between items-center">
+        <div>
+          <button
+            className={`px-4 py-2 rounded mr-2 ${
+              withinBusinessHours 
+                ? 'bg-green-500 text-white hover:bg-green-600' 
+                : 'bg-gray-300 text-gray-700 cursor-not-allowed'
+            }`}
+            onClick={handleAutoDialer}
+            disabled={!withinBusinessHours || selectedLeads.length === 0}
+          >
+            Auto-Dial Selected Leads
+          </button>
+          <span className="text-sm">
+            {withinBusinessHours 
+              ? '✅ Within business hours' 
+              : `⚠️ Outside business hours (${businessHoursInfo.days || 'M-F'}, ${businessHoursInfo.start || '9:30 AM'}-${businessHoursInfo.end || '4:00 PM'} ${businessHoursInfo.timezone || 'MT'})`}
+          </span>
+        </div>
+        <div>
+          <span className="text-sm">Selected: {selectedLeads.length}</span>
+        </div>
+      </div>
+
       <table className="min-w-full bg-white rounded shadow overflow-hidden">
         <thead>
           <tr>
+            <th className="px-4 py-2 w-10">
+              <input 
+                type="checkbox" 
+                onChange={(e) => {
+                  if (e.target.checked) {
+                    setSelectedLeads(leads.map(lead => lead.id));
+                  } else {
+                    setSelectedLeads([]);
+                  }
+                }}
+                checked={selectedLeads.length === leads.length && leads.length > 0}
+              />
+            </th>
             <th className="px-4 py-2">Business Name</th>
             <th className="px-4 py-2">Phone</th>
             <th className="px-4 py-2">Industry</th>
@@ -168,6 +399,13 @@ export default function LeadTable({ leads, onStatusChange }) {
         <tbody>
           {leads.map((lead) => (
             <tr key={lead.id} className="border-t">
+              <td className="px-4 py-2">
+                <input 
+                  type="checkbox" 
+                  checked={selectedLeads.includes(lead.id)}
+                  onChange={() => toggleLeadSelection(lead.id)}
+                />
+              </td>
               <td className="px-4 py-2">{lead.name}</td>
               <td className="px-4 py-2">{lead.phone}</td>
               <td className="px-4 py-2">{lead.industry || lead.category}</td>
@@ -184,8 +422,16 @@ export default function LeadTable({ leads, onStatusChange }) {
                   className="bg-blue-500 text-white px-3 py-1 rounded hover:bg-blue-600 disabled:opacity-50"
                   disabled={loadingId === lead.id || lead.status === 'Calling'}
                   onClick={() => handleCall(lead)}
+                  title={!withinBusinessHours ? "Outside business hours - use Manual Call" : ""}
                 >
-                  Call
+                  Auto Call
+                </button>
+                <button
+                  className="bg-orange-500 text-white px-3 py-1 rounded hover:bg-orange-600 disabled:opacity-50"
+                  disabled={loadingId === lead.id || lead.status === 'Calling'}
+                  onClick={() => handleManualCall(lead)}
+                >
+                  Manual Call
                 </button>
                 <button
                   className="bg-yellow-500 text-white px-3 py-1 rounded hover:bg-yellow-600 disabled:opacity-50"
@@ -202,10 +448,23 @@ export default function LeadTable({ leads, onStatusChange }) {
                   Book
                 </button>
                 <button
+                  className="bg-cyan-500 text-white px-3 py-1 rounded hover:bg-cyan-600 disabled:opacity-50"
+                  disabled={loadingId === lead.id || lead.status === 'Appointment Set'}
+                  onClick={() => openFollowUpModal(lead)}
+                >
+                  Follow-up
+                </button>
+                <button
                   className="bg-green-500 text-white px-3 py-1 rounded hover:bg-green-600"
                   onClick={() => handleTranscript(lead)}
                 >
                   Transcript
+                </button>
+                <button
+                  className="bg-indigo-500 text-white px-3 py-1 rounded hover:bg-indigo-600"
+                  onClick={() => openHistoryModal(lead)}
+                >
+                  History
                 </button>
               </td>
             </tr>
@@ -359,6 +618,95 @@ export default function LeadTable({ leads, onStatusChange }) {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Schedule Follow-up Modal */}
+      {showFollowUpModal && selectedLead && (
+        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-40 z-50">
+          <div className="bg-white p-6 rounded shadow max-w-lg w-full relative">
+            <button className="absolute top-2 right-2 text-xl" onClick={closeFollowUpModal}>&times;</button>
+            <h2 className="text-lg font-bold mb-4">Schedule Follow-up: {selectedLead.name}</h2>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-1">Date & Time</label>
+                <input 
+                  type="datetime-local" 
+                  className="w-full border p-2 rounded"
+                  value={followUpData.scheduled_time}
+                  onChange={(e) => setFollowUpData({...followUpData, scheduled_time: e.target.value})}
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium mb-1">Priority (1-10)</label>
+                <input 
+                  type="range" 
+                  min="1" 
+                  max="10" 
+                  className="w-full"
+                  value={followUpData.priority}
+                  onChange={(e) => setFollowUpData({...followUpData, priority: parseInt(e.target.value)})}
+                />
+                <div className="flex justify-between text-xs text-gray-500">
+                  <span>Low (1)</span>
+                  <span>Medium (5)</span>
+                  <span>High (10)</span>
+                </div>
+                <div className="text-center font-bold mt-1">
+                  {followUpData.priority}
+                </div>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium mb-1">Reason</label>
+                <input 
+                  type="text" 
+                  className="w-full border p-2 rounded"
+                  value={followUpData.reason}
+                  onChange={(e) => setFollowUpData({...followUpData, reason: e.target.value})}
+                  placeholder="Why are you following up?"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium mb-1">Notes</label>
+                <textarea 
+                  className="w-full border p-2 rounded"
+                  value={followUpData.notes}
+                  onChange={(e) => setFollowUpData({...followUpData, notes: e.target.value})}
+                  rows={3}
+                  placeholder="Additional details about the follow-up"
+                />
+              </div>
+            </div>
+            
+            <div className="mt-4 flex justify-end space-x-3">
+              <button 
+                className="px-4 py-2 border rounded hover:bg-gray-100"
+                onClick={closeFollowUpModal}
+              >
+                Cancel
+              </button>
+              <button 
+                className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:opacity-50"
+                onClick={saveFollowUp}
+                disabled={loadingId === selectedLead.id}
+              >
+                {loadingId === selectedLead.id ? 'Saving...' : 'Schedule Follow-up'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Lead History Modal */}
+      {showHistoryModal && selectedLead && (
+        <LeadHistoryModal 
+          lead={selectedLead} 
+          open={showHistoryModal} 
+          onClose={() => setShowHistoryModal(false)} 
+        />
       )}
     </div>
   );
