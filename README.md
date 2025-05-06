@@ -1,283 +1,121 @@
-# Seamless Mobile Services Appointment Booker for Mobile Service Businesses
+# Steve - Automated Appointment Booking System
 
-An AI-powered appointment setting system adapted for mobile service businesses in Denver/Colorado Springs. This system follows Steve Schiffman's appointment-setting methodology to qualify leads and set appointments for companies with 10+ employees using mobile devices.
+Steve is an AI-powered automated phone calling system designed to set appointments for businesses. It uses voice AI to make outbound calls, qualify leads, and book appointments with customers.
 
-## Key Features
+## Features
 
-- **Automated Lead Generation**: Scrapes business leads from online sources focused on service industries
-- **AI Voice Calls**: Uses Twilio for phone calls and ElevenLabs for natural voice synthesis
-- **Steve Schiffman Methodology**: Follows proven appointment setting script structure
-- **Business Hours Restriction**: Calls only allowed Monday-Friday 9:30AM-4:00PM Mountain Time 
-- **Zoho CRM Integration**: Syncs leads, qualification data, and appointments with Zoho
-- **Mobile Service Business Focus**: Targets companies with field service crews using mobile devices
-- **Dual Service Offering**: Provides both telecom expense management and mobile device management
+- **Automated Outbound Calling**: Make automated phone calls to lead lists
+- **AI Conversation**: Natural language conversations powered by OpenAI GPT models
+- **Voice Synthesis**: High-quality voice using ElevenLabs TTS
+- **Voicemail Detection**: Automatically detects when a call reaches voicemail
+- **Lead Management**: Track and manage leads through a web interface
+- **Appointment Scheduling**: Book and manage appointments
+- **Follow-up System**: Intelligent follow-up scheduling
+- **Time Restrictions**: Respects business hours for calls
 
-## Target Business Types
+## Tech Stack
 
-The system is optimized for the following types of businesses:
+- **Backend**: Python with Flask
+- **Frontend**: React with TailwindCSS
+- **AI**: OpenAI GPT-4/3.5 for conversation handling
+- **Voice**: ElevenLabs for text-to-speech
+- **Calling**: Twilio for phone capabilities
+- **Database**: SQLite (can be replaced with other databases)
 
-### Field Service Businesses (heavy mobile use)
-- Plumbing companies
-- HVAC & heating contractors
-- Electrical contractors
-- General construction firms
-- Roofing companies
-- Pest control companies
-- Septic/waste removal services
-- Landscaping companies
-
-*These businesses equip techs with phones/tablets to track jobs, manage schedules, and communicate.*
-
-### Fleet & Logistics Operations
-- Delivery companies
-- Trucking companies
-- Courier services
-- Towing companies
-- Field inspection agencies
-- Waste management contractors
-
-*They often have dispatch systems that depend on smartphones or tablets, and need usage monitoring.*
-
-### Labor-Heavy or Jobsite-Heavy Businesses
-- Construction & excavation
-- Concrete companies
-- Drilling & boring contractors
-- Utility contractors (fiber, power, water)
-
-*Lots of crews in the field = lots of devices that need managing.*
-
-### Technical Field Services
-- Telecom installation companies
-- Security system installers
-- Solar panel installers
-- Maintenance companies
-
-*High tech reliance = great fit for MDM and app support.*
-
-### Mobile Healthcare & Home Services
-- In-home care agencies
-- Mobile phlebotomy / lab testing
-- Rehab or therapy on-site services
-
-*HIPAA compliance and secure mobile communication matters — a strong pitch point.*
-
-### Multi-location Small Chains
-- Property management companies
-- Car dealerships
-- Franchise service businesses (cleaning, pest, etc.)
-- Private security companies
-- Independent schools or tutoring centers
-
-*Often overlooked but often overspend on lines and have multiple devices across sites.*
-
-### Qualification Filters
-When generating leads, look for:
-- 10–200 employees
-- Keywords: "fleet", "dispatch", "technician", "field service", or "tablet" in job descriptions or websites
-
-## Getting Started
+## Setup
 
 ### Prerequisites
 
-- Python 3.8+ 
+- Python 3.7+
 - Node.js 14+
-- API keys for:
-  - Twilio (phone calls)
-  - ElevenLabs (voice synthesis)
-  - OpenAI/GPT-4 (conversation AI)
-  - Bright Data (lead scraping)
-  - Zoho CRM (optional)
+- Twilio account
+- ElevenLabs account
+- OpenAI API key
 
-### Installation
+### Backend Setup
 
-1. Clone the repository
-2. Set up a virtual environment for Python
-3. Install backend dependencies:
+1. Navigate to the backend directory:
    ```
    cd backend
+   ```
+
+2. Create a virtual environment:
+   ```
+   python -m venv env
+   source env/bin/activate  # On Windows: env\Scripts\activate
+   ```
+
+3. Install dependencies:
+   ```
    pip install -r requirements.txt
    ```
-4. Install frontend dependencies:
+
+4. Configure your environment:
+   Create a `.env` file in the backend directory with:
+   ```
+   OPENAI_API_KEY=your_openai_api_key
+   ELEVENLABS_API_KEY=your_elevenlabs_api_key
+   ELEVENLABS_VOICE_ID=your_elevenlabs_voice_id
+   TWILIO_ACCOUNT_SID=your_twilio_account_sid
+   TWILIO_AUTH_TOKEN=your_twilio_auth_token
+   TWILIO_PHONE_NUMBER=your_twilio_phone_number
+   CALLBACK_URL=your_ngrok_or_public_url
+   ```
+
+### Frontend Setup
+
+1. Navigate to the frontend directory:
    ```
    cd frontend
+   ```
+
+2. Install dependencies:
+   ```
    npm install
    ```
 
-### Configuration
+3. Configure the frontend:
+   Create a `.env` file in the frontend directory with:
+   ```
+   REACT_APP_API_URL=http://localhost:5001
+   ```
 
-Create a `.env` file in the `backend` directory with the following keys:
-```
-TWILIO_ACCOUNT_SID=your_twilio_sid
-TWILIO_AUTH_TOKEN=your_twilio_token
-TWILIO_PHONE_NUMBER=your_twilio_phone
-ELEVENLABS_API_KEY=your_elevenlabs_key
-ELEVENLABS_AGENT_ID=your_voice_id_or_leave_default
-LLM_API_KEY=your_openai_key
-BRIGHTDATA_API_TOKEN=your_brightdata_token
-BRIGHTDATA_WEB_UNLOCKER_ZONE=your_zone_name
-CALLBACK_URL=your_webhook_url_or_localhost
-ZOHO_ORG_ID=your_zoho_org_id
-ZOHO_CLIENT_ID=your_zoho_client_id
-ZOHO_CLIENT_SECRET=your_zoho_client_secret
-ZOHO_REFRESH_TOKEN=your_zoho_refresh_token
-ZOHO_DEPARTMENT_ID=your_zoho_department_id
-```
+## Running the Application
 
-Alternatively, you can enter these values in the Settings UI after starting the application.
+### Start the Backend
 
-### Running the Application
-
-For the easiest startup, use one of the restart scripts:
-
-**Windows Batch File**:
-```
-restart.bat
-```
-
-**PowerShell Script**:
-```
-.\restart.ps1
-```
-
-These scripts will:
-1. Kill any processes using ports 5003 and 3000
-2. Clean up any lingering Node.js or Python processes
-3. Start the backend on port 5003
-4. Start the frontend on port 3000
-
-Access the application at: http://localhost:3000
-
-### Manual Startup
-
-If you prefer to start servers manually:
-
-**Backend**:
 ```
 cd backend
-python app.py --port=5003
+python app.py
 ```
 
-**Frontend**:
+The backend server will start on port 5001.
+
+### Start the Frontend
+
 ```
 cd frontend
 npm start
 ```
 
+The frontend will be available at http://localhost:3000.
+
 ## Using the Application
 
-### Adding Leads
+1. **Import Leads**: Upload a CSV file with lead information or use the scraper feature
+2. **Set Up Calling Hours**: Configure business hours in the settings
+3. **Make Calls**: Select leads and initiate calls
+4. **Monitor Conversations**: View call logs and transcripts
+5. **Manage Appointments**: See and manage scheduled appointments
 
-1. **Scrape Leads**:
-   - Select location, industry, and number of leads to find
-   - Click "Find New Leads"
+## Testing the System
 
-2. **Add Leads Manually**:
-   - Click "Add Lead"
-   - Fill out the business information
-   - Click "Add Lead"
+For testing without using actual API calls, set `TEST_MODE=True` in your backend config.
 
-### Making Calls
+## License
 
-1. Click the "Call" button next to a lead
-2. The system will check if it's during business hours
-3. The AI will follow the Schiffman method:
-   - Introduction
-   - Qualifying questions (mobile devices, employee count)
-   - Brief value statement
-   - Appointment setting
-   - Objection handling
-   - Close
+This project is licensed under the MIT License - see the LICENSE file for details.
 
-### Viewing Call Results
+## Contact
 
-1. Click the "Transcript" button to view call history
-2. Use the "Qualify" button to update lead qualification 
-3. Book appointments for qualified leads
-
-## Business Hours
-
-Calls can only be made:
-- Monday through Friday
-- 9:30 AM to 4:00 PM Mountain Time
-
-Calls already in progress will be allowed to complete even if they extend past business hours.
-
-## Integrations
-
-### Zoho CRM 
-
-When properly configured, the system:
-1. Creates new leads in Zoho
-2. Updates qualification status
-3. Creates calendar events for appointments
-
-## Customization
-
-Modify the Steve Schiffman script prompts in `voice.py` to adjust the conversation approach if needed.
-
-## Support
-
-For questions or issues, contact Ato and Matt at Trout Mobile.
-
-## Troubleshooting and Fixes
-
-### Call Destination Issue
-We identified and fixed an issue where despite having the correct phone number in the database, the system was incorrectly calling a different number.
-
-The fix involved modifying the `place_call` function in `backend/voice.py` to correctly use the intended phone number when making calls via Twilio.
-
-### Test Suite
-
-The system includes a comprehensive test suite located in the `tests` directory:
-
-1. **tests/test_system.py** - Complete system test that checks all components
-2. **tests/test_conversation_flow.py** - Tests the AI conversation logic
-3. **tests/test_conversation.py** - Tests the full conversation with a test lead
-4. **tests/test_twilio_call.py** - Tests the Twilio credentials and makes a test call
-
-To run all tests:
-```
-python -m tests.run_tests
-```
-
-To run a specific test:
-```
-python -m tests.run_tests --test system
-```
-
-To run a test with a phone number for testing calls:
-```
-python -m tests.run_tests --test system --phone YOUR_PHONE_NUMBER
-```
-
-### Diagnostic Scripts
-
-Several diagnostic and testing scripts were created:
-
-1. **check_logs.py** - Checks the database records for a specific lead
-2. **make_call.py** - Initial script to test making calls via the API 
-3. **check_call_status.py** - Verifies call destinations using Twilio API
-4. **fix_and_call.py** - Updates the database with the correct phone number and tests making calls
-
-## System Configuration
-
-- Twilio account has sufficient balance and valid credentials
-- The callback URL is configured to use ngrok for webhook handling
-
-## Development Notes
-
-- The ngrok executable (`ngrok.exe`) is excluded from git via the `.gitignore` file
-- To set up a local development environment, you'll need to:
-  1. Download ngrok from https://ngrok.com/download
-  2. Place the ngrok executable in the project root (it will be ignored by git)
-  3. Use ngrok to create a tunnel for the webhook: `ngrok http 5001`
-  4. Update the `CALLBACK_URL` in your config.json with the ngrok URL
-
-## Usage
-
-To start the system:
-1. Run the backend server
-2. Set up ngrok for handling callbacks if testing locally
-3. Use the frontend to manage leads and initiate calls
-
-The system now correctly calls the intended phone number (3036426337) for appointment scheduling.
+For support or inquiries, please reach out to [your contact information].
