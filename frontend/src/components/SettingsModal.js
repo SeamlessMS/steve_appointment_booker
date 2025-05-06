@@ -9,7 +9,7 @@ export default function SettingsModal({ open, onClose, onSave }) {
     TWILIO_AUTH_TOKEN: '',
     TWILIO_PHONE_NUMBER: '',
     ELEVENLABS_API_KEY: '',
-    ELEVENLABS_AGENT_ID: '',
+    ELEVENLABS_VOICE_ID: '',
     LLM_API_KEY: '',
     BRIGHTDATA_API_TOKEN: '',
     BRIGHTDATA_WEB_UNLOCKER_ZONE: '',
@@ -25,6 +25,8 @@ export default function SettingsModal({ open, onClose, onSave }) {
   const [saved, setSaved] = useState(false);
   const [learningDays, setLearningDays] = useState(30);
   const [learningStatus, setLearningStatus] = useState({ message: '', visible: false });
+  const [voiceStatus, setVoiceStatus] = useState({ status: 'unknown', message: '', testing: false });
+  const [testAudio, setTestAudio] = useState(null);
 
   useEffect(() => {
     if (open) {
@@ -47,6 +49,51 @@ export default function SettingsModal({ open, onClose, onSave }) {
     setSaved(true);
     if (onSave) onSave(config);
     setTimeout(() => setSaved(false), 1500);
+  };
+  
+  const testVoiceSettings = async () => {
+    setVoiceStatus({ status: 'testing', message: 'Testing ElevenLabs voice...', testing: true });
+    try {
+      const response = await axios.get(`${API_BASE}/voice_check`);
+      const data = response.data;
+      
+      if (data.status === 'working' && data.test_successful) {
+        setVoiceStatus({ 
+          status: 'success', 
+          message: `Voice "${data.voice_name}" is working correctly.`, 
+          testing: false 
+        });
+        
+        // If there's a test audio URL, set it for playback
+        if (data.test_audio_url) {
+          setTestAudio(`${API_BASE.replace('/api', '')}${data.test_audio_url}`);
+        }
+      } else if (data.status === 'working' && !data.test_successful) {
+        setVoiceStatus({ 
+          status: 'warning', 
+          message: `Voice "${data.voice_name}" is configured but test failed: ${data.test_error}`, 
+          testing: false 
+        });
+      } else if (data.status === 'unconfigured') {
+        setVoiceStatus({ 
+          status: 'error', 
+          message: 'ElevenLabs voice is not configured. Please add API key and Voice ID.', 
+          testing: false 
+        });
+      } else {
+        setVoiceStatus({ 
+          status: 'error', 
+          message: `Error: ${data.message}`, 
+          testing: false 
+        });
+      }
+    } catch (error) {
+      setVoiceStatus({ 
+        status: 'error', 
+        message: `Error connecting to voice service: ${error.message}`, 
+        testing: false 
+      });
+    }
   };
   
   const triggerLearning = async () => {
@@ -144,8 +191,34 @@ export default function SettingsModal({ open, onClose, onSave }) {
             <h3 className="font-medium mb-2">AI Voice & Intelligence</h3>
             <div className="space-y-2">
               <input name="ELEVENLABS_API_KEY" value={config.ELEVENLABS_API_KEY} onChange={handleChange} placeholder="ElevenLabs API Key" className="w-full border p-2 rounded" />
-              <input name="ELEVENLABS_AGENT_ID" value={config.ELEVENLABS_AGENT_ID} onChange={handleChange} placeholder="ElevenLabs Voice ID" className="w-full border p-2 rounded" />
+              <input name="ELEVENLABS_VOICE_ID" value={config.ELEVENLABS_VOICE_ID} onChange={handleChange} placeholder="ElevenLabs Voice ID" className="w-full border p-2 rounded" />
               <input name="LLM_API_KEY" value={config.LLM_API_KEY} onChange={handleChange} placeholder="OpenAI API Key" className="w-full border p-2 rounded" />
+              
+              <div className="mt-2">
+                <button
+                  className="bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700 text-sm disabled:opacity-50"
+                  onClick={testVoiceSettings}
+                  disabled={voiceStatus.testing || !config.ELEVENLABS_API_KEY || !config.ELEVENLABS_VOICE_ID}
+                >
+                  {voiceStatus.testing ? 'Testing...' : 'Test Voice Settings'}
+                </button>
+                
+                {voiceStatus.status !== 'unknown' && (
+                  <div className={`mt-2 text-sm p-2 rounded ${
+                    voiceStatus.status === 'success' ? 'bg-green-100 text-green-800' : 
+                    voiceStatus.status === 'warning' ? 'bg-yellow-100 text-yellow-800' : 
+                    'bg-red-100 text-red-800'
+                  }`}>
+                    {voiceStatus.message}
+                    {testAudio && (
+                      <div className="mt-2">
+                        <p className="mb-1 font-medium">Test Audio:</p>
+                        <audio controls src={testAudio} className="w-full mt-1" />
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
           

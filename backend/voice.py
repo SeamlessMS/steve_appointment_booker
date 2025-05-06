@@ -59,6 +59,15 @@ def get_llm_response(prompt, conversation_history=None, stage="introduction", in
         5. Handle objections with the Ledge technique (acknowledge, pivot back to appointment)
         6. Maintain a professional, confident tone
         
+        To sound more natural and human-like:
+        1. Use contractions (I'm, we've, can't, don't)
+        2. Include occasional filler words like "um" or "you know" (but sparingly)
+        3. Start some sentences with connectors like "So," "Well," or "And"
+        4. Occasionally correct yourself mid-sentence or rephrase
+        5. Vary your sentence length and structure
+        6. Use more casual language and informal phrases
+        7. Sound engaged and empathetic by responding to what the person just said 
+        
         For objection handling:
         - If "not interested": Respond with a benefit example and restate meeting request
         - If "too busy": Suggest a short meeting later, "even 10 minutes can find savings"
@@ -163,12 +172,15 @@ def elevenlabs_tts(text):
         "Content-Type": "application/json"
     }
     
+    # More natural voice settings
     data = {
         "text": text,
-        "model_id": "eleven_monolingual_v1",
+        "model_id": "eleven_turbo_v2",  # Use the latest model if available
         "voice_settings": {
-            "stability": 0.75,
-            "similarity_boost": 0.75
+            "stability": 0.6,  # Lower stability for more natural variations
+            "similarity_boost": 0.8,  # Higher similarity for consistent voice character
+            "style": 0.4,      # Add some style to the voice
+            "use_speaker_boost": True  # Enhance clarity for phone calls
         }
     }
     
@@ -290,6 +302,22 @@ def get_voice_response(text, lead_data=None, history=None, is_voicemail=False):
     config = get_config()
     use_elevenlabs = config.get('ELEVENLABS_API_KEY') and config.get('ELEVENLABS_VOICE_ID')
     
+    # Add a brief natural thinking pause at the beginning of each response
+    # This makes it sound more like a human who is considering their response
+    if not is_voicemail and history and len(history) > 1:  # Don't pause for the first response or voicemail
+        response.pause(length=0.5)  # Half second pause, adjust as needed
+    
+    # Add strategic pauses to make speech more natural
+    # Break the text into sentences and add pauses between them
+    sentences = re.split(r'(?<=[.!?])\s+', text)
+    enhanced_text = ""
+    
+    for sentence in sentences:
+        enhanced_text += sentence + " "
+        # Add a short pause between sentences
+        if not sentence.endswith(('.', '!', '?')):
+            enhanced_text += ". "
+    
     # If this is a voicemail, adjust the message to be more concise
     if is_voicemail:
         # For voicemail, use a more complete message that doesn't expect interaction
@@ -316,10 +344,20 @@ def get_voice_response(text, lead_data=None, history=None, is_voicemail=False):
         voicemail_text += f" Please call us back at {formatted_number}."
         voicemail_text += " Thank you and have a great day."
         
+        # Apply the same sentence parsing to voicemail
+        sentences = re.split(r'(?<=[.!?])\s+', voicemail_text)
+        enhanced_voicemail_text = ""
+        
+        for sentence in sentences:
+            enhanced_voicemail_text += sentence + " "
+            # Add a short pause between sentences
+            if not sentence.endswith(('.', '!', '?')):
+                enhanced_voicemail_text += ". "
+        
         if use_elevenlabs:
             try:
                 # Generate audio file
-                audio_file = elevenlabs_tts(voicemail_text)
+                audio_file = elevenlabs_tts(enhanced_voicemail_text)
                 if audio_file and os.path.exists(audio_file):
                     # Get the full URL for the audio file
                     webhook_url = config.get('CALLBACK_URL', '').rstrip('/webhook')
@@ -342,7 +380,7 @@ def get_voice_response(text, lead_data=None, history=None, is_voicemail=False):
         if use_elevenlabs:
             try:
                 # Generate audio file
-                audio_file = elevenlabs_tts(text)
+                audio_file = elevenlabs_tts(enhanced_text)
                 if audio_file and os.path.exists(audio_file):
                     # Get the full URL for the audio file
                     webhook_url = config.get('CALLBACK_URL', '').rstrip('/webhook')
