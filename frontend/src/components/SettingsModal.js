@@ -22,9 +22,19 @@ export default function SettingsModal({ open, onClose, onSave }) {
   
   useEffect(() => {
     if (open) {
-      axios.get(`${API_BASE}/config`).then(r => setSettings(r.data));
+      fetchSettings();
     }
   }, [open]);
+
+  const fetchSettings = async () => {
+    try {
+      const response = await axios.get(`${API_BASE}/config`);
+      setSettings(response.data);
+    } catch (error) {
+      setError(error.response?.data?.message || 'Failed to fetch settings');
+      setTimeout(() => setError(null), 3000);
+    }
+  };
 
   const handleChange = (e) => {
     setSettings({ ...settings, [e.target.name]: e.target.value });
@@ -34,13 +44,20 @@ export default function SettingsModal({ open, onClose, onSave }) {
     setSettings({ ...settings, [e.target.name]: e.target.checked });
   };
 
-  const handleSave = async () => {
+  const handleSave = async (e) => {
+    if (e) e.preventDefault();
     setLoading(true);
-    await axios.post(`${API_BASE}/config`, settings);
-    setLoading(false);
-    setSuccess(true);
-    if (onSave) onSave(settings);
-    setTimeout(() => setSuccess(false), 1500);
+    try {
+      await axios.post(`${API_BASE}/config`, settings);
+      setLoading(false);
+      setSuccess('Settings saved successfully');
+      if (onSave) onSave(settings);
+      setTimeout(() => setSuccess(false), 1500);
+    } catch (error) {
+      setLoading(false);
+      setError(error.response?.data?.message || 'Failed to save settings');
+      setTimeout(() => setError(null), 3000);
+    }
   };
   
   const testVoiceSettings = async () => {
@@ -177,7 +194,7 @@ export default function SettingsModal({ open, onClose, onSave }) {
           )}
           
           {activeTab === 'general' && (
-            <form onSubmit={handleSubmit}>
+            <form onSubmit={handleSave}>
               <div className="mb-4">
                 <label className="block text-sm font-medium mb-1">OpenAI API Key</label>
                 <input 
@@ -220,7 +237,7 @@ export default function SettingsModal({ open, onClose, onSave }) {
                   id="TEST_MODE"
                   name="TEST_MODE"
                   checked={settings.TEST_MODE}
-                  onChange={handleChange}
+                  onChange={handleToggleChange}
                   className="mr-2"
                 />
                 <label htmlFor="TEST_MODE" className="text-sm font-medium">Test Mode</label>
@@ -232,7 +249,7 @@ export default function SettingsModal({ open, onClose, onSave }) {
                   id="AUTO_QUALIFICATION"
                   name="AUTO_QUALIFICATION"
                   checked={settings.AUTO_QUALIFICATION}
-                  onChange={handleChange}
+                  onChange={handleToggleChange}
                   className="mr-2"
                 />
                 <label htmlFor="AUTO_QUALIFICATION" className="text-sm font-medium">Auto-Qualification</label>
@@ -289,7 +306,7 @@ export default function SettingsModal({ open, onClose, onSave }) {
                     id="ZOHO_ENABLED"
                     name="ZOHO_ENABLED"
                     checked={settings.ZOHO_ENABLED}
-                    onChange={handleChange}
+                    onChange={handleToggleChange}
                     className="mr-2"
                   />
                   <label htmlFor="ZOHO_ENABLED" className="text-sm font-medium">Enable Zoho Integration</label>
@@ -321,7 +338,7 @@ export default function SettingsModal({ open, onClose, onSave }) {
                 </button>
                 <button
                   type="button"
-                  onClick={handleSubmit}
+                  onClick={handleSave}
                   className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
                   disabled={loading}
                 >

@@ -2,6 +2,7 @@ import os
 import shutil
 import subprocess
 import sys
+import shutil
 
 def setup_project():
     """Set up the Steve Appointment Booker project."""
@@ -54,11 +55,24 @@ def setup_project():
     print("\nSetting up frontend...")
     try:
         os.chdir('frontend')
-        subprocess.run(['npm', 'install'], check=True)
+        
+        # Find npm in PATH
+        npm_path = shutil.which('npm')
+        if not npm_path:
+            print("Error: npm not found in PATH. Please ensure Node.js is installed and in your system PATH.")
+            return False
+            
+        print(f"Found npm at: {npm_path}")
+        
+        # Run npm install with full path
+        subprocess.run([npm_path, 'install'], check=True)
         print("Installed frontend dependencies")
         os.chdir('..')
     except subprocess.CalledProcessError as e:
         print(f"Error setting up frontend: {e}")
+        return False
+    except Exception as e:
+        print(f"Unexpected error during frontend setup: {e}")
         return False
 
     print("\nSetup completed successfully!")
