@@ -5,6 +5,7 @@ import SettingsModal from './components/SettingsModal';
 import AppointmentList from './components/AppointmentList';
 import FollowUpList from './components/FollowUpList';
 import AddLeadModal from './components/AddLeadModal';
+import SteveDashboard from './components/SteveDashboard';
 import axios from 'axios';
 
 const API_BASE = process.env.REACT_APP_API_BASE || 'http://localhost:5003/api';
@@ -82,6 +83,9 @@ function App() {
           </button>
         </div>
       </div>
+      
+      {/* Steve Dashboard */}
+      <SteveDashboard />
       
       {/* Navigation Tabs */}
       <div className="flex border-b mb-6">

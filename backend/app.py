@@ -632,8 +632,17 @@ def webhook_recording():
 # --- Leads CRUD ---
 @app.route('/api/leads', methods=['GET'])
 def get_leads():
+    # Check if we're filtering by status
+    status = request.args.get('status')
+    
     with get_db() as conn:
-        leads = conn.execute('SELECT * FROM leads').fetchall()
+        if status:
+            # Filter leads by status
+            leads = conn.execute('SELECT * FROM leads WHERE status = ?', (status,)).fetchall()
+        else:
+            # Get all leads
+            leads = conn.execute('SELECT * FROM leads').fetchall()
+        
         return jsonify([dict(row) for row in leads])
 
 @app.route('/api/leads', methods=['POST'])
