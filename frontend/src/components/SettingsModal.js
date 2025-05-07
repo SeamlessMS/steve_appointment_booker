@@ -1,54 +1,46 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import VoiceSelector from './VoiceSelector';
 
 const API_BASE = process.env.REACT_APP_API_BASE || 'http://localhost:5003/api';
 
 export default function SettingsModal({ open, onClose, onSave }) {
-  const [config, setConfig] = useState({
-    TWILIO_ACCOUNT_SID: '',
-    TWILIO_AUTH_TOKEN: '',
-    TWILIO_PHONE_NUMBER: '',
+  const [settings, setSettings] = useState({
+    OPENAI_API_KEY: '',
     ELEVENLABS_API_KEY: '',
-    ELEVENLABS_VOICE_ID: '',
-    LLM_API_KEY: '',
-    BRIGHTDATA_API_TOKEN: '',
-    BRIGHTDATA_WEB_UNLOCKER_ZONE: '',
-    ZOHO_ORG_ID: '',
-    ZOHO_CLIENT_ID: '',
-    ZOHO_CLIENT_SECRET: '',
-    ZOHO_REFRESH_TOKEN: '',
-    ZOHO_DEPARTMENT_ID: '',
-    CALLBACK_URL: '',
-    TEST_MODE: true
+    TEST_MODE: false,
+    AUTO_QUALIFICATION: true,
+    APPOINTMENT_LINK: '',
+    ZOHO_API_KEY: '',
+    ZOHO_ENABLED: false,
   });
+  
   const [loading, setLoading] = useState(false);
-  const [saved, setSaved] = useState(false);
-  const [learningDays, setLearningDays] = useState(30);
-  const [learningStatus, setLearningStatus] = useState({ message: '', visible: false });
-  const [voiceStatus, setVoiceStatus] = useState({ status: 'unknown', message: '', testing: false });
-  const [testAudio, setTestAudio] = useState(null);
-
+  const [error, setError] = useState(null);
+  const [success, setSuccess] = useState(null);
+  const [activeTab, setActiveTab] = useState('general'); // 'general', 'voice', 'zoho'
+  
   useEffect(() => {
     if (open) {
-      axios.get(`${API_BASE}/config`).then(r => setConfig(r.data));
+      axios.get(`${API_BASE}/config`).then(r => setSettings(r.data));
     }
   }, [open]);
 
   const handleChange = (e) => {
-    setConfig({ ...config, [e.target.name]: e.target.value });
+    setSettings({ ...settings, [e.target.name]: e.target.value });
   };
   
   const handleToggleChange = (e) => {
-    setConfig({ ...config, [e.target.name]: e.target.checked });
+    setSettings({ ...settings, [e.target.name]: e.target.checked });
   };
 
   const handleSave = async () => {
     setLoading(true);
-    await axios.post(`${API_BASE}/config`, config);
+    await axios.post(`${API_BASE}/config`, settings);
     setLoading(false);
-    setSaved(true);
-    if (onSave) onSave(config);
-    setTimeout(() => setSaved(false), 1500);
+    setSuccess(true);
+    if (onSave) onSave(settings);
+    setTimeout(() => setSuccess(false), 1500);
   };
   
   const testVoiceSettings = async () => {
@@ -119,133 +111,226 @@ export default function SettingsModal({ open, onClose, onSave }) {
     }, 5000);
   };
 
+  // Add a handler for Zoho CRM sync
+  const handleZohoSync = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      setSuccess(null);
+      
+      const response = await axios.post(`${API_BASE}/zoho/sync`);
+      setSuccess(`Successfully synced ${response.data.syncedCount} appointments to Zoho CRM`);
+    } catch (err) {
+      console.error('Error syncing to Zoho:', err);
+      setError(err.response?.data?.error || 'Failed to sync with Zoho CRM');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   if (!open) return null;
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
-      <div className="bg-white p-6 rounded shadow max-w-lg w-full relative overflow-y-auto max-h-screen">
-        <button className="absolute top-2 right-2 text-xl" onClick={onClose}>&times;</button>
-        <h2 className="text-lg font-bold mb-4">API Key Settings</h2>
-        
-        <div className="space-y-4">
-          <div className="border-b pb-4">
-            <h3 className="font-medium mb-2">System Mode</h3>
-            <div className="flex items-center space-x-2">
-              <input 
-                type="checkbox" 
-                id="test_mode_toggle"
-                name="TEST_MODE"
-                checked={config.TEST_MODE}
-                onChange={handleToggleChange}
-                className="h-5 w-5"
-              />
-              <label htmlFor="test_mode_toggle" className="font-medium">
-                Test Mode {config.TEST_MODE ? '(Enabled)' : '(Disabled)'}
-              </label>
-            </div>
-            <p className="text-sm text-gray-500 mt-1">
-              When enabled, calls will be simulated without using external APIs or making real phone calls.
-            </p>
-          </div>
-          
-          <div className="border-b pb-4">
-            <h3 className="font-medium mb-2">System Learning</h3>
-            <p className="text-sm text-gray-600 mb-2">
-              Steve can learn from successful conversations to improve future calls.
-            </p>
-            <div className="flex items-center space-x-2 mb-2">
-              <label className="text-sm">Analyze last</label>
-              <input 
-                type="number" 
-                min="7"
-                max="365"
-                value={learningDays}
-                onChange={(e) => setLearningDays(parseInt(e.target.value))}
-                className="w-16 border p-1 rounded"
-              />
-              <label className="text-sm">days of successful calls</label>
-            </div>
-            <button
-              className="bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700 text-sm"
-              onClick={triggerLearning}
-            >
-              Start Learning Process
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-lg shadow-lg w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+        <div className="p-6">
+          <div className="flex justify-between items-center mb-6">
+            <h2 className="text-xl font-bold">Application Settings</h2>
+            <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
             </button>
-            {learningStatus.visible && (
-              <div className={`mt-2 text-sm p-2 rounded ${learningStatus.isError ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'}`}>
-                {learningStatus.message}
-              </div>
-            )}
           </div>
           
-          <div>
-            <h3 className="font-medium mb-2">Twilio Voice Settings</h3>
-            <div className="space-y-2">
-              <input name="TWILIO_ACCOUNT_SID" value={config.TWILIO_ACCOUNT_SID} onChange={handleChange} placeholder="Twilio Account SID" className="w-full border p-2 rounded" />
-              <input name="TWILIO_AUTH_TOKEN" value={config.TWILIO_AUTH_TOKEN} onChange={handleChange} placeholder="Twilio Auth Token" className="w-full border p-2 rounded" />
-              <input name="TWILIO_PHONE_NUMBER" value={config.TWILIO_PHONE_NUMBER} onChange={handleChange} placeholder="Twilio Phone Number" className="w-full border p-2 rounded" />
-              <input name="CALLBACK_URL" value={config.CALLBACK_URL} onChange={handleChange} placeholder="Webhook Callback URL" className="w-full border p-2 rounded" />
+          <div className="flex border-b mb-6">
+            <button 
+              className={`px-4 py-2 font-medium ${activeTab === 'general' ? 'border-b-2 border-indigo-500 text-indigo-600' : 'text-gray-500'}`}
+              onClick={() => setActiveTab('general')}
+            >
+              General
+            </button>
+            <button 
+              className={`px-4 py-2 font-medium ${activeTab === 'voice' ? 'border-b-2 border-indigo-500 text-indigo-600' : 'text-gray-500'}`}
+              onClick={() => setActiveTab('voice')}
+            >
+              Voice
+            </button>
+            <button 
+              className={`px-4 py-2 font-medium ${activeTab === 'zoho' ? 'border-b-2 border-indigo-500 text-indigo-600' : 'text-gray-500'}`}
+              onClick={() => setActiveTab('zoho')}
+            >
+              Zoho CRM
+            </button>
+          </div>
+          
+          {error && (
+            <div className="mb-4 p-3 bg-red-100 text-red-800 rounded">
+              {error}
             </div>
-          </div>
+          )}
           
-          <div>
-            <h3 className="font-medium mb-2">AI Voice & Intelligence</h3>
-            <div className="space-y-2">
-              <input name="ELEVENLABS_API_KEY" value={config.ELEVENLABS_API_KEY} onChange={handleChange} placeholder="ElevenLabs API Key" className="w-full border p-2 rounded" />
-              <input name="ELEVENLABS_VOICE_ID" value={config.ELEVENLABS_VOICE_ID} onChange={handleChange} placeholder="ElevenLabs Voice ID" className="w-full border p-2 rounded" />
-              <input name="LLM_API_KEY" value={config.LLM_API_KEY} onChange={handleChange} placeholder="OpenAI API Key" className="w-full border p-2 rounded" />
+          {success && (
+            <div className="mb-4 p-3 bg-green-100 text-green-800 rounded">
+              {success}
+            </div>
+          )}
+          
+          {activeTab === 'general' && (
+            <form onSubmit={handleSubmit}>
+              <div className="mb-4">
+                <label className="block text-sm font-medium mb-1">OpenAI API Key</label>
+                <input 
+                  type="password" 
+                  name="OPENAI_API_KEY"
+                  value={settings.OPENAI_API_KEY}
+                  onChange={handleChange}
+                  className="w-full p-2 border rounded"
+                  placeholder="sk-..."
+                />
+              </div>
               
-              <div className="mt-2">
+              <div className="mb-4">
+                <label className="block text-sm font-medium mb-1">ElevenLabs API Key</label>
+                <input 
+                  type="password" 
+                  name="ELEVENLABS_API_KEY"
+                  value={settings.ELEVENLABS_API_KEY}
+                  onChange={handleChange}
+                  className="w-full p-2 border rounded"
+                />
+              </div>
+              
+              <div className="mb-4">
+                <label className="block text-sm font-medium mb-1">Appointment Link</label>
+                <input 
+                  type="text" 
+                  name="APPOINTMENT_LINK"
+                  value={settings.APPOINTMENT_LINK}
+                  onChange={handleChange}
+                  className="w-full p-2 border rounded"
+                  placeholder="https://calendly.com/your-link"
+                />
+                <p className="text-xs text-gray-500 mt-1">Link where customers can book appointments</p>
+              </div>
+              
+              <div className="mb-4 flex items-center">
+                <input 
+                  type="checkbox" 
+                  id="TEST_MODE"
+                  name="TEST_MODE"
+                  checked={settings.TEST_MODE}
+                  onChange={handleChange}
+                  className="mr-2"
+                />
+                <label htmlFor="TEST_MODE" className="text-sm font-medium">Test Mode</label>
+              </div>
+              
+              <div className="mb-6 flex items-center">
+                <input 
+                  type="checkbox" 
+                  id="AUTO_QUALIFICATION"
+                  name="AUTO_QUALIFICATION"
+                  checked={settings.AUTO_QUALIFICATION}
+                  onChange={handleChange}
+                  className="mr-2"
+                />
+                <label htmlFor="AUTO_QUALIFICATION" className="text-sm font-medium">Auto-Qualification</label>
+              </div>
+              
+              <div className="flex justify-end space-x-2">
                 <button
-                  className="bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700 text-sm disabled:opacity-50"
-                  onClick={testVoiceSettings}
-                  disabled={voiceStatus.testing || !config.ELEVENLABS_API_KEY || !config.ELEVENLABS_VOICE_ID}
+                  type="button"
+                  onClick={onClose}
+                  className="px-4 py-2 border rounded"
                 >
-                  {voiceStatus.testing ? 'Testing...' : 'Test Voice Settings'}
+                  Cancel
                 </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                  disabled={loading}
+                >
+                  {loading ? 'Saving...' : 'Save Changes'}
+                </button>
+              </div>
+            </form>
+          )}
+          
+          {activeTab === 'voice' && (
+            <VoiceSelector onSave={() => {
+              setSuccess('Voice settings saved successfully');
+              fetchSettings();
+            }} />
+          )}
+          
+          {activeTab === 'zoho' && (
+            <div>
+              <div className="mb-6">
+                <h3 className="font-semibold mb-4">Zoho CRM Integration</h3>
+                <p className="text-sm text-gray-600 mb-4">
+                  Configure integration with Zoho CRM to automatically sync appointments.
+                </p>
                 
-                {voiceStatus.status !== 'unknown' && (
-                  <div className={`mt-2 text-sm p-2 rounded ${
-                    voiceStatus.status === 'success' ? 'bg-green-100 text-green-800' : 
-                    voiceStatus.status === 'warning' ? 'bg-yellow-100 text-yellow-800' : 
-                    'bg-red-100 text-red-800'
-                  }`}>
-                    {voiceStatus.message}
-                    {testAudio && (
-                      <div className="mt-2">
-                        <p className="mb-1 font-medium">Test Audio:</p>
-                        <audio controls src={testAudio} className="w-full mt-1" />
-                      </div>
-                    )}
-                  </div>
-                )}
+                <div className="mb-4">
+                  <label className="block text-sm font-medium mb-1">Zoho API Key</label>
+                  <input 
+                    type="password" 
+                    name="ZOHO_API_KEY"
+                    value={settings.ZOHO_API_KEY}
+                    onChange={handleChange}
+                    className="w-full p-2 border rounded"
+                  />
+                </div>
+                
+                <div className="mb-6 flex items-center">
+                  <input 
+                    type="checkbox" 
+                    id="ZOHO_ENABLED"
+                    name="ZOHO_ENABLED"
+                    checked={settings.ZOHO_ENABLED}
+                    onChange={handleChange}
+                    className="mr-2"
+                  />
+                  <label htmlFor="ZOHO_ENABLED" className="text-sm font-medium">Enable Zoho Integration</label>
+                </div>
+                
+                <div className="bg-gray-50 p-4 rounded border mb-6">
+                  <h4 className="font-medium mb-2">Manual Sync</h4>
+                  <p className="text-sm text-gray-600 mb-3">
+                    Sync pending appointments to Zoho CRM manually.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={handleZohoSync}
+                    className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 disabled:opacity-50"
+                    disabled={loading || !settings.ZOHO_ENABLED || !settings.ZOHO_API_KEY}
+                  >
+                    {loading ? 'Syncing...' : 'Sync to Zoho CRM'}
+                  </button>
+                </div>
+              </div>
+              
+              <div className="flex justify-end space-x-2">
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="px-4 py-2 border rounded"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSubmit}
+                  className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                  disabled={loading}
+                >
+                  {loading ? 'Saving...' : 'Save Changes'}
+                </button>
               </div>
             </div>
-          </div>
-          
-          <div>
-            <h3 className="font-medium mb-2">Lead Scraping</h3>
-            <div className="space-y-2">
-              <input name="BRIGHTDATA_API_TOKEN" value={config.BRIGHTDATA_API_TOKEN} onChange={handleChange} placeholder="Bright Data API Token" className="w-full border p-2 rounded" />
-              <input name="BRIGHTDATA_WEB_UNLOCKER_ZONE" value={config.BRIGHTDATA_WEB_UNLOCKER_ZONE} onChange={handleChange} placeholder="Bright Data Zone Name" className="w-full border p-2 rounded" />
-            </div>
-          </div>
-          
-          <div>
-            <h3 className="font-medium mb-2">Zoho CRM Integration</h3>
-            <div className="space-y-2">
-              <input name="ZOHO_ORG_ID" value={config.ZOHO_ORG_ID} onChange={handleChange} placeholder="Zoho Organization ID" className="w-full border p-2 rounded" />
-              <input name="ZOHO_CLIENT_ID" value={config.ZOHO_CLIENT_ID} onChange={handleChange} placeholder="Zoho Client ID" className="w-full border p-2 rounded" />
-              <input name="ZOHO_CLIENT_SECRET" value={config.ZOHO_CLIENT_SECRET} onChange={handleChange} placeholder="Zoho Client Secret" className="w-full border p-2 rounded" />
-              <input name="ZOHO_REFRESH_TOKEN" value={config.ZOHO_REFRESH_TOKEN} onChange={handleChange} placeholder="Zoho Refresh Token" className="w-full border p-2 rounded" />
-              <input name="ZOHO_DEPARTMENT_ID" value={config.ZOHO_DEPARTMENT_ID} onChange={handleChange} placeholder="Zoho Department ID" className="w-full border p-2 rounded" />
-            </div>
-          </div>
+          )}
         </div>
-        
-        <button onClick={handleSave} className="mt-6 bg-indigo-600 text-white px-6 py-2 rounded hover:bg-indigo-700 disabled:opacity-50" disabled={loading}>
-          {loading ? 'Saving...' : 'Save Settings'}
-        </button>
-        {saved && <div className="text-green-600 mt-2">Saved!</div>}
       </div>
     </div>
   );

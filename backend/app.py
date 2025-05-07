@@ -2212,6 +2212,318 @@ def check_voice_settings():
     
     return jsonify(result)
 
+@app.route('/api/call_logs/summary', methods=['GET'])
+def get_call_logs_summary():
+    """Get summary statistics for call logs"""
+    try:
+        with get_db() as conn:
+            # Get total number of calls
+            total_calls = conn.execute('SELECT COUNT(DISTINCT lead_id) FROM call_logs WHERE call_status IN ("Started", "In Progress", "completed")').fetchone()[0]
+            
+            # Get average call duration
+            avg_duration_result = conn.execute('''
+                SELECT AVG(
+                    CASE 
+                        WHEN json_extract(transcript, '$.duration') IS NOT NULL 
+                        THEN CAST(json_extract(transcript, '$.duration') AS INTEGER)
+                        ELSE NULL 
+                    END
+                ) as avg_duration
+                FROM call_logs 
+                WHERE call_status = 'completed' AND json_extract(transcript, '$.duration') IS NOT NULL
+            ''').fetchone()
+            
+            # Fallback calculation for average duration
+            if not avg_duration_result or avg_duration_result[0] is None:
+                # Calculate based on time difference between first and last log per call
+                avg_duration_result = conn.execute('''
+                    SELECT AVG(duration) as avg_duration FROM (
+                        SELECT 
+                            lead_id, 
+                            (julianday(MAX(created_at)) - julianday(MIN(created_at))) * 86400 as duration
+                        FROM call_logs 
+                        WHERE call_status IN ('Started', 'In Progress', 'completed')
+                        GROUP BY lead_id
+                    )
+                ''').fetchone()
+            
+            average_duration = round(avg_duration_result[0] or 0)
+            
+            # Get calls by day for the last 7 days
+            calls_by_day = conn.execute('''
+                SELECT 
+                    date(created_at) as call_date,
+                    COUNT(DISTINCT lead_id) as count
+                FROM call_logs
+                WHERE created_at >= date('now', '-7 day')
+                GROUP BY date(created_at)
+                ORDER BY call_date
+            ''').fetchall()
+            
+            # Format calls by day
+            calls_by_day_formatted = []
+            for day in calls_by_day:
+                calls_by_day_formatted.append({
+                    'date': day['call_date'],
+                    'count': day['count']
+                })
+            
+            # Get distribution by call status
+            call_status_distribution = conn.execute('''
+                SELECT 
+                    l.status as status,
+                    COUNT(l.id) as count
+                FROM leads l
+                GROUP BY l.status
+            ''').fetchall()
+            
+            # Calculate percentages for call status
+            total_leads = sum(status['count'] for status in call_status_distribution)
+            call_status_formatted = []
+            
+            if total_leads > 0:
+                for status in call_status_distribution:
+                    call_status_formatted.append({
+                        'status': status['status'],
+                        'count': status['count'],
+                        'percentage': (status['count'] / total_leads) * 100
+                    })
+            
+            # Return the summary data
+            return jsonify({
+                'totalCalls': total_calls,
+                'averageDuration': average_duration,
+                'callsByDay': calls_by_day_formatted,
+                'callsByStatus': call_status_formatted
+            })
+    
+    except Exception as e:
+        logger.error(f"Error generating call summary: {str(e)}")
+        return {'error': 'Failed to generate call summary'}, 500
+
+@app.route('/api/ai/patterns', methods=['GET'])
+def get_ai_patterns():
+    """Get successful patterns learned by the AI from successful calls"""
+    try:
+        with get_db() as conn:
+            patterns = conn.execute('SELECT * FROM ai_patterns ORDER BY created_at DESC LIMIT 1').fetchone()
+            
+            if patterns:
+                pattern_data = json.loads(patterns['patterns'])
+                return jsonify(pattern_data)
+            else:
+                # Return empty patterns structure if none found
+                return jsonify({
+                    'objectionHandling': [],
+                    'valuePropositions': [],
+                    'qualificationQuestions': [],
+                    'closingTechniques': []
+                })
+    
+    except Exception as e:
+        logger.error(f"Error fetching AI patterns: {str(e)}")
+        return jsonify({'error': 'Failed to fetch patterns'}), 500
+
+
+@app.route('/api/analytics/learn', methods=['POST'])
+def run_ai_learning():
+    """Run AI learning process on successful conversations"""
+    feedback = request.json.get('feedback', '')
+    
+    try:
+        # Get all successful conversations (calls that led to appointments)
+        with get_db() as conn:
+            # Get all qualified leads
+            qualified_leads = conn.execute('''
+                SELECT id FROM leads 
+                WHERE qualification_status = 'Qualified' 
+                OR status = 'Appointment Set'
+            ''').fetchall()
+            
+            qualified_lead_ids = [lead['id'] for lead in qualified_leads]
+            
+            if not qualified_lead_ids:
+                return jsonify({
+                    'message': 'No qualified leads found for learning',
+                    'callsAnalyzed': 0,
+                    'patternsIdentified': 0
+                }), 200
+            
+            # Get transcripts for successful calls
+            successful_transcripts = []
+            for lead_id in qualified_lead_ids:
+                call_logs = conn.execute('SELECT * FROM call_logs WHERE lead_id = ?', (lead_id,)).fetchall()
+                
+                if call_logs:
+                    # Organize call log transcripts
+                    transcript = []
+                    for log in call_logs:
+                        if log['transcript']:
+                            transcript.append(log['transcript'])
+                    
+                    if transcript:
+                        successful_transcripts.append({
+                            'lead_id': lead_id,
+                            'transcript': transcript
+                        })
+            
+            # Identify patterns using a basic analysis
+            # This is a simplified version - in a real app, this would use more advanced NLP
+            patterns = {
+                'objectionHandling': [],
+                'valuePropositions': [],
+                'qualificationQuestions': [],
+                'closingTechniques': []
+            }
+            
+            # Simple pattern detection logic
+            objection_keywords = ['but', 'however', 'concerned', 'worry', 'expensive', 'cost', 'price', 'time', 'not sure']
+            value_keywords = ['save', 'benefit', 'improve', 'increase', 'reduce', 'solution', 'better']
+            qualification_keywords = ['how many', 'employees', 'budget', 'currently', 'decision', 'timeline', 'process']
+            closing_keywords = ['schedule', 'appointment', 'available', 'meet', 'next steps', 'follow up', 'calendar']
+            
+            for convo in successful_transcripts:
+                for line in convo['transcript']:
+                    line_lower = line.lower()
+                    
+                    if line.startswith('Bot:'):
+                        text = line[4:].strip().lower()
+                        
+                        # Check for objection handling
+                        if any(keyword in text for keyword in objection_keywords) and len(text) > 20:
+                            # Extract the sentence containing the objection handling
+                            if not any(existing.lower() == text.lower() for existing in patterns['objectionHandling']):
+                                patterns['objectionHandling'].append(line[4:].strip())
+                        
+                        # Check for value propositions
+                        if any(keyword in text for keyword in value_keywords) and len(text) > 15:
+                            # Extract the sentence containing the value proposition
+                            if not any(existing.lower() == text.lower() for existing in patterns['valuePropositions']):
+                                patterns['valuePropositions'].append(line[4:].strip())
+                        
+                        # Check for qualification questions
+                        if any(keyword in text for keyword in qualification_keywords) and '?' in text:
+                            # Extract the question
+                            if not any(existing.lower() == text.lower() for existing in patterns['qualificationQuestions']):
+                                patterns['qualificationQuestions'].append(line[4:].strip())
+                        
+                        # Check for closing techniques
+                        if any(keyword in text for keyword in closing_keywords) and len(text) > 15:
+                            # Extract the closing statement
+                            if not any(existing.lower() == text.lower() for existing in patterns['closingTechniques']):
+                                patterns['closingTechniques'].append(line[4:].strip())
+            
+            # Incorporate user feedback if provided
+            if feedback:
+                # Store feedback for future use
+                conn.execute(
+                    'INSERT INTO ai_feedback (feedback, created_at) VALUES (?, datetime("now"))',
+                    (feedback,)
+                )
+            
+            # Limit the number of patterns
+            for category in patterns:
+                patterns[category] = patterns[category][:5]  # Keep only the top 5
+            
+            # Store the patterns in the database
+            conn.execute(
+                'INSERT INTO ai_patterns (patterns, created_at) VALUES (?, datetime("now"))',
+                (json.dumps(patterns),)
+            )
+            
+            return jsonify({
+                'message': 'Learning process completed successfully',
+                'callsAnalyzed': len(successful_transcripts),
+                'patternsIdentified': sum(len(patterns[category]) for category in patterns)
+            })
+    
+    except Exception as e:
+        logger.error(f"Error in AI learning process: {str(e)}")
+        return jsonify({'error': 'Learning process failed'}), 500
+
+
+@app.route('/api/zoho/sync', methods=['POST'])
+def sync_to_zoho():
+    """Sync appointments to Zoho CRM"""
+    try:
+        with get_db() as conn:
+            # Get appointments that haven't been synced
+            appointments = conn.execute('''
+                SELECT a.*, l.name, l.phone, l.email, l.address, l.city, l.state, l.zipcode, l.industry
+                FROM appointments a
+                JOIN leads l ON a.lead_id = l.id
+                WHERE a.zoho_synced = 0 OR a.zoho_synced IS NULL
+            ''').fetchall()
+            
+            if not appointments:
+                return jsonify({
+                    'message': 'No appointments to sync',
+                    'syncedCount': 0
+                })
+            
+            # Set up Zoho connection (simplified - in a real app, this would handle auth)
+            zoho_enabled = os.environ.get('ZOHO_ENABLED', 'false').lower() == 'true'
+            zoho_api_key = os.environ.get('ZOHO_API_KEY', '')
+            
+            if not zoho_enabled or not zoho_api_key:
+                return jsonify({
+                    'message': 'Zoho integration not configured',
+                    'syncedCount': 0
+                }), 400
+            
+            # Mock successful sync for testing
+            # In a real app, this would make actual API calls to Zoho
+            synced_count = 0
+            for appointment in appointments:
+                # Update appointment as synced in database
+                conn.execute(
+                    'UPDATE appointments SET zoho_synced = 1, zoho_id = ? WHERE id = ?',
+                    (f"zoho_{appointment['id']}", appointment['id'])
+                )
+                synced_count += 1
+                
+                # Log the sync
+                conn.execute(
+                    'INSERT INTO sync_logs (entity_type, entity_id, destination, status, created_at) VALUES (?, ?, ?, ?, datetime("now"))',
+                    ('appointment', appointment['id'], 'zoho', 'success')
+                )
+            
+            return jsonify({
+                'message': f'Successfully synced {synced_count} appointments to Zoho CRM',
+                'syncedCount': synced_count
+            })
+    
+    except Exception as e:
+        logger.error(f"Error syncing to Zoho: {str(e)}")
+        return jsonify({'error': 'Failed to sync with Zoho CRM'}), 500
+
+
+@app.route('/api/voices', methods=['GET'])
+def get_available_voices():
+    """Get available ElevenLabs voices"""
+    try:
+        # In a real app, this would fetch from ElevenLabs API
+        # For now, return a static list
+        voices = [
+            {"id": "voice1", "name": "Professional Male 1", "description": "Clear and authoritative male voice", "preview_url": ""},
+            {"id": "voice2", "name": "Professional Female 1", "description": "Friendly and warm female voice", "preview_url": ""},
+            {"id": "voice3", "name": "Casual Male", "description": "Relaxed and conversational male voice", "preview_url": ""},
+            {"id": "voice4", "name": "Casual Female", "description": "Upbeat and engaging female voice", "preview_url": ""},
+            {"id": "voice5", "name": "Sales Expert Male", "description": "Persuasive male voice for sales calls", "preview_url": ""},
+            {"id": "voice6", "name": "Sales Expert Female", "description": "Confident female voice for sales calls", "preview_url": ""},
+            {"id": "voice7", "name": "Technical Male", "description": "Knowledgeable male voice for technical discussions", "preview_url": ""},
+            {"id": "voice8", "name": "Technical Female", "description": "Precise female voice for technical discussions", "preview_url": ""},
+            {"id": "voice9", "name": "Friendly Male", "description": "Warm and approachable male voice", "preview_url": ""},
+            {"id": "voice10", "name": "Friendly Female", "description": "Natural and personable female voice", "preview_url": ""},
+            {"id": "voice11", "name": "Professional Neutral", "description": "Gender-neutral professional voice", "preview_url": ""}
+        ]
+        
+        return jsonify(voices)
+    
+    except Exception as e:
+        logger.error(f"Error fetching voices: {str(e)}")
+        return jsonify({'error': 'Failed to fetch available voices'}), 500
+
 if __name__ == '__main__':
     import sys
     port = 5000

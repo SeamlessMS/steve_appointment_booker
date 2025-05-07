@@ -6,6 +6,8 @@ import AppointmentList from './components/AppointmentList';
 import FollowUpList from './components/FollowUpList';
 import AddLeadModal from './components/AddLeadModal';
 import SteveDashboard from './components/SteveDashboard';
+import AnalyticsDashboard from './components/AnalyticsDashboard';
+import AITrainingInterface from './components/AITrainingInterface';
 import axios from 'axios';
 
 const API_BASE = process.env.REACT_APP_API_BASE || 'http://localhost:5003/api';
@@ -106,6 +108,18 @@ function App() {
           onClick={() => setActiveTab('followups')}
         >
           Follow-ups
+        </button>
+        <button 
+          className={`px-4 py-2 font-medium ${activeTab === 'analytics' ? 'border-b-2 border-indigo-500 text-indigo-600' : 'text-gray-500'}`}
+          onClick={() => setActiveTab('analytics')}
+        >
+          Analytics
+        </button>
+        <button 
+          className={`px-4 py-2 font-medium ${activeTab === 'training' ? 'border-b-2 border-indigo-500 text-indigo-600' : 'text-gray-500'}`}
+          onClick={() => setActiveTab('training')}
+        >
+          AI Training
         </button>
       </div>
       
@@ -226,6 +240,14 @@ function App() {
 
       {activeTab === 'followups' && (
         <FollowUpList />
+      )}
+      
+      {activeTab === 'analytics' && (
+        <AnalyticsDashboard />
+      )}
+      
+      {activeTab === 'training' && (
+        <AITrainingInterface />
       )}
       
       <SettingsModal 
