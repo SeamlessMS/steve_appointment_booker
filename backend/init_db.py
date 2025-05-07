@@ -156,6 +156,7 @@ def init_db():
             ('ZOHO_API_KEY', ''),
             ('ZOHO_ENABLED', 'false'),
             ('DEFAULT_VOICE_ID', 'voice1'),
+            ('CONFIRM_DELETIONS', 'true'),
         ]
         
         for key, value in settings:

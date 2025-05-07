@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import VoiceSelector from './VoiceSelector';
 
-const API_BASE = process.env.REACT_APP_API_BASE || 'http://localhost:5003/api';
+const API_BASE = process.env.REACT_APP_API_BASE || 'http://localhost:5001/api';
 
 export default function SettingsModal({ open, onClose, onSave }) {
   const [settings, setSettings] = useState({
@@ -13,6 +13,7 @@ export default function SettingsModal({ open, onClose, onSave }) {
     APPOINTMENT_LINK: '',
     ZOHO_API_KEY: '',
     ZOHO_ENABLED: false,
+    CONFIRM_DELETIONS: true,
   });
   
   const [loading, setLoading] = useState(false);
@@ -243,7 +244,7 @@ export default function SettingsModal({ open, onClose, onSave }) {
                 <label htmlFor="TEST_MODE" className="text-sm font-medium">Test Mode</label>
               </div>
               
-              <div className="mb-6 flex items-center">
+              <div className="mb-4 flex items-center">
                 <input 
                   type="checkbox" 
                   id="AUTO_QUALIFICATION"
@@ -253,6 +254,19 @@ export default function SettingsModal({ open, onClose, onSave }) {
                   className="mr-2"
                 />
                 <label htmlFor="AUTO_QUALIFICATION" className="text-sm font-medium">Auto-Qualification</label>
+              </div>
+              
+              <div className="mb-6 flex items-center">
+                <input 
+                  type="checkbox" 
+                  id="CONFIRM_DELETIONS"
+                  name="CONFIRM_DELETIONS"
+                  checked={settings.CONFIRM_DELETIONS}
+                  onChange={handleToggleChange}
+                  className="mr-2"
+                />
+                <label htmlFor="CONFIRM_DELETIONS" className="text-sm font-medium">Confirm Deletions</label>
+                <p className="text-xs text-gray-500 ml-2">Show confirmation dialogs when deleting leads</p>
               </div>
               
               <div className="flex justify-end space-x-2">

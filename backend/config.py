@@ -32,7 +32,9 @@ DEFAULT_CONFIG = {
     # Call recording settings
     'RECORDING_ENABLED': False,
     # Test mode toggle
-    'TEST_MODE': False
+    'TEST_MODE': False,
+    # Confirmation dialog settings
+    'CONFIRM_DELETIONS': 'true'
 }
 
 CONFIG_FILE = 'config.json'

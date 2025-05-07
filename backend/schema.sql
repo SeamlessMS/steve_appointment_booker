@@ -121,7 +121,8 @@ INSERT OR IGNORE INTO settings (key, value) VALUES
 ('APPOINTMENT_LINK', 'https://calendly.com/seamless-mobile'),
 ('ZOHO_API_KEY', ''),
 ('ZOHO_ENABLED', 'false'),
-('DEFAULT_VOICE_ID', 'voice1');
+('DEFAULT_VOICE_ID', 'voice1'),
+('CONFIRM_DELETIONS', 'true');
 
 -- Default voice settings
 INSERT OR IGNORE INTO voice_settings 

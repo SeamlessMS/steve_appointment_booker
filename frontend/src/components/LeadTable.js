@@ -30,6 +30,7 @@ export default function LeadTable({ leads, onStatusChange }) {
   const [businessHoursInfo, setBusinessHoursInfo] = useState({});
   const [selectedLeads, setSelectedLeads] = useState([]);
   const [notification, setNotification] = useState({ show: false, message: '', type: '' });
+  const [appConfig, setAppConfig] = useState({ CONFIRM_DELETIONS: true });
   const [qualificationData, setQualificationData] = useState({
     qualified: false,
     uses_mobile_devices: 'Unknown',
@@ -59,6 +60,15 @@ export default function LeadTable({ leads, onStatusChange }) {
       .catch(error => {
         console.error("Error checking business hours:", error);
         setWithinBusinessHours(false);
+      });
+      
+    // Load app settings
+    axios.get(`${API_BASE}/config`)
+      .then(response => {
+        setAppConfig(response.data);
+      })
+      .catch(error => {
+        console.error("Error loading app settings:", error);
       });
   }, []);
 
@@ -159,7 +169,11 @@ export default function LeadTable({ leads, onStatusChange }) {
       return;
     }
 
-    if (!window.confirm(`Are you sure you want to delete ${selectedLeads.length} lead(s)? This action cannot be undone.`)) {
+    // Check if confirmations are enabled and if user confirms deletion
+    const shouldDelete = !appConfig.CONFIRM_DELETIONS || 
+      window.confirm(`Are you sure you want to delete ${selectedLeads.length} lead(s)? This action cannot be undone.`);
+    
+    if (!shouldDelete) {
       return;
     }
 
@@ -185,7 +199,11 @@ export default function LeadTable({ leads, onStatusChange }) {
   };
 
   const handleDeleteLead = async (leadId) => {
-    if (!window.confirm("Are you sure you want to delete this lead? This action cannot be undone.")) {
+    // Check if confirmations are enabled and if user confirms deletion
+    const shouldDelete = !appConfig.CONFIRM_DELETIONS || 
+      window.confirm("Are you sure you want to delete this lead? This action cannot be undone.");
+    
+    if (!shouldDelete) {
       return;
     }
 
