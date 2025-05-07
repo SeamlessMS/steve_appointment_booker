@@ -1,121 +1,132 @@
-# Steve - Automated Appointment Booking System
+# Steve Appointment Booker
 
-Steve is an AI-powered automated phone calling system designed to set appointments for businesses. It uses voice AI to make outbound calls, qualify leads, and book appointments with customers.
+An AI-powered appointment booking system that uses voice calls to qualify leads and schedule appointments.
 
-## Features
+## Quick Start
 
-- **Automated Outbound Calling**: Make automated phone calls to lead lists
-- **AI Conversation**: Natural language conversations powered by OpenAI GPT models
-- **Voice Synthesis**: High-quality voice using ElevenLabs TTS
-- **Voicemail Detection**: Automatically detects when a call reaches voicemail
-- **Lead Management**: Track and manage leads through a web interface
-- **Appointment Scheduling**: Book and manage appointments
-- **Follow-up System**: Intelligent follow-up scheduling
-- **Time Restrictions**: Respects business hours for calls
-
-## Tech Stack
-
-- **Backend**: Python with Flask
-- **Frontend**: React with TailwindCSS
-- **AI**: OpenAI GPT-4/3.5 for conversation handling
-- **Voice**: ElevenLabs for text-to-speech
-- **Calling**: Twilio for phone capabilities
-- **Database**: SQLite (can be replaced with other databases)
-
-## Setup
-
-### Prerequisites
-
-- Python 3.7+
-- Node.js 14+
-- Twilio account
-- ElevenLabs account
-- OpenAI API key
-
-### Backend Setup
-
-1. Navigate to the backend directory:
-   ```
-   cd backend
-   ```
-
-2. Create a virtual environment:
-   ```
-   python -m venv env
-   source env/bin/activate  # On Windows: env\Scripts\activate
-   ```
-
-3. Install dependencies:
-   ```
-   pip install -r requirements.txt
-   ```
-
-4. Configure your environment:
-   Create a `.env` file in the backend directory with:
-   ```
-   OPENAI_API_KEY=your_openai_api_key
-   ELEVENLABS_API_KEY=your_elevenlabs_api_key
-   ELEVENLABS_VOICE_ID=your_elevenlabs_voice_id
-   TWILIO_ACCOUNT_SID=your_twilio_account_sid
-   TWILIO_AUTH_TOKEN=your_twilio_auth_token
-   TWILIO_PHONE_NUMBER=your_twilio_phone_number
-   CALLBACK_URL=your_ngrok_or_public_url
-   ```
-
-### Frontend Setup
-
-1. Navigate to the frontend directory:
-   ```
-   cd frontend
-   ```
-
-2. Install dependencies:
-   ```
-   npm install
-   ```
-
-3. Configure the frontend:
-   Create a `.env` file in the frontend directory with:
-   ```
-   REACT_APP_API_URL=http://localhost:5001
-   ```
-
-## Running the Application
-
-### Start the Backend
-
-```
+1. **Setup Backend**
+```bash
 cd backend
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+pip install -r requirements.txt
+python init_db.py
 python app.py
 ```
 
-The backend server will start on port 5001.
-
-### Start the Frontend
-
-```
+2. **Setup Frontend**
+```bash
 cd frontend
+npm install
 npm start
 ```
 
-The frontend will be available at http://localhost:3000.
+## Required API Keys
 
-## Using the Application
+Add these in the Settings panel after starting the app:
 
-1. **Import Leads**: Upload a CSV file with lead information or use the scraper feature
-2. **Set Up Calling Hours**: Configure business hours in the settings
-3. **Make Calls**: Select leads and initiate calls
-4. **Monitor Conversations**: View call logs and transcripts
-5. **Manage Appointments**: See and manage scheduled appointments
+- OpenAI API Key (for conversation intelligence)
+- ElevenLabs API Key (for voice synthesis)
+- Zoho API Key (optional, for CRM integration)
 
-## Testing the System
+## Features
 
-For testing without using actual API calls, set `TEST_MODE=True` in your backend config.
+- 🤖 AI-powered voice calls
+- 📊 Real-time call analytics
+- 📝 Automatic call transcription
+- 📅 Appointment scheduling
+- 🔄 Zoho CRM integration
+- 📱 Mobile device management focus
+- 🎓 Self-learning capabilities
 
-## License
+## Environment Variables
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+Backend (.env):
+```
+OPENAI_API_KEY=your_key_here
+ELEVENLABS_API_KEY=your_key_here
+ZOHO_API_KEY=your_key_here
+TEST_MODE=true
+```
 
-## Contact
+Frontend (.env):
+```
+REACT_APP_API_BASE=http://localhost:5001/api
+```
 
-For support or inquiries, please reach out to [your contact information].
+## Common Issues
+
+1. **App Won't Start**
+   - Ensure Python 3.8+ is installed
+   - Check if all requirements are installed
+   - Verify database is initialized
+   - Confirm ports 5001 (backend) and 3000 (frontend) are available
+
+2. **Voice Not Working**
+   - Verify ElevenLabs API key is set
+   - Check selected voice ID exists
+   - Ensure internet connection is stable
+
+3. **CRM Sync Issues**
+   - Verify Zoho API key
+   - Enable Zoho integration in settings
+   - Check appointment format matches Zoho requirements
+
+## Architecture
+
+- Frontend: React with Tailwind CSS
+- Backend: Python Flask API
+- Database: SQLite
+- Voice: ElevenLabs API
+- AI: OpenAI API
+- CRM: Zoho API
+
+## Development
+
+To run in development mode with hot reloading:
+
+1. Backend:
+```bash
+cd backend
+python app.py --port=5001
+```
+
+2. Frontend:
+```bash
+cd frontend
+npm run dev
+```
+
+## Testing
+
+```bash
+# Backend tests
+cd backend
+python -m pytest
+
+# Frontend tests
+cd frontend
+npm test
+```
+
+## Production Deployment
+
+1. Build frontend:
+```bash
+cd frontend
+npm run build
+```
+
+2. Serve backend:
+```bash
+cd backend
+gunicorn app:app
+```
+
+## Support
+
+For issues or questions:
+1. Check common issues above
+2. Review error logs in `backend/logs`
+3. Ensure all API keys are valid
+4. Verify database is properly initialized
