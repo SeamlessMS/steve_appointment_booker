@@ -741,8 +741,8 @@ export default function LeadTable({ leads, onStatusChange }) {
 
       {/* Pagination */}
       {filteredLeads.length > leadsPerPage && (
-        <div className="mt-4 flex justify-between items-center">
-          <div className="flex items-center">
+        <div className="mt-4 flex flex-col md:flex-row justify-between items-start md:items-center">
+          <div className="flex items-center mb-2 md:mb-0">
             <span className="mr-2 text-sm text-gray-600">Leads per page:</span>
             <select 
               value={leadsPerPage} 
@@ -763,7 +763,7 @@ export default function LeadTable({ leads, onStatusChange }) {
             </span>
           </div>
           
-          <div className="flex space-x-1">
+          <div className="pagination-container">
             <button
               onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
               disabled={currentPage === 1}
