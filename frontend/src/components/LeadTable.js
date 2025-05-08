@@ -49,6 +49,14 @@ export default function LeadTable({ leads, onStatusChange }) {
     notes: ''
   });
   const [availableTimes, setAvailableTimes] = useState([]);
+  
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [leadsPerPage, setLeadsPerPage] = useState(10);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterStatus, setFilterStatus] = useState('All');
+  const [sortField, setSortField] = useState('name');
+  const [sortDirection, setSortDirection] = useState('asc');
 
   useEffect(() => {
     // Check business hours when component mounts
@@ -71,6 +79,11 @@ export default function LeadTable({ leads, onStatusChange }) {
         console.error("Error loading app settings:", error);
       });
   }, []);
+
+  // Reset pagination when leads change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [leads.length, searchTerm, filterStatus]);
 
   const handleCall = async (lead) => {
     setLoadingId(lead.id);
@@ -428,6 +441,61 @@ export default function LeadTable({ leads, onStatusChange }) {
     setShowHistoryModal(true);
   };
 
+  // Sorting and filtering logic
+  const sortLeads = (leadsToSort) => {
+    return [...leadsToSort].sort((a, b) => {
+      let aValue = a[sortField];
+      let bValue = b[sortField];
+      
+      // Handle special sort cases
+      if (sortField === 'employee_count') {
+        aValue = parseInt(aValue) || 0;
+        bValue = parseInt(bValue) || 0;
+      }
+      
+      if (sortDirection === 'asc') {
+        return aValue > bValue ? 1 : -1;
+      } else {
+        return aValue < bValue ? 1 : -1;
+      }
+    });
+  };
+
+  const handleSort = (field) => {
+    // If clicking on the current sort field, toggle direction
+    if (field === sortField) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      // New field, default to ascending
+      setSortField(field);
+      setSortDirection('asc');
+    }
+  };
+
+  // Filter leads by search term and status
+  const filteredLeads = leads.filter(lead => {
+    const matchesSearch = 
+      (lead.name && lead.name.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      (lead.phone && lead.phone.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      (lead.industry && lead.industry.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      (lead.category && lead.category.toLowerCase().includes(searchTerm.toLowerCase()));
+    
+    const matchesStatus = filterStatus === 'All' || lead.status === filterStatus;
+    
+    return matchesSearch && matchesStatus;
+  });
+
+  // Sort the filtered leads
+  const sortedLeads = sortLeads(filteredLeads);
+  
+  // Get current leads for pagination
+  const indexOfLastLead = currentPage * leadsPerPage;
+  const indexOfFirstLead = indexOfLastLead - leadsPerPage;
+  const currentLeads = sortedLeads.slice(indexOfFirstLead, indexOfLastLead);
+  
+  // Change page
+  const paginate = (pageNumber) => setCurrentPage(pageNumber);
+
   return (
     <div>
       {notification.show && (
@@ -439,144 +507,316 @@ export default function LeadTable({ leads, onStatusChange }) {
         </div>
       )}
 
-      <div className="mb-4 flex justify-between items-center">
-        <div className="flex space-x-2">
+      <div className="mb-4 flex flex-col md:flex-row justify-between items-start md:items-center space-y-4 md:space-y-0">
+        <div className="flex flex-col md:flex-row space-y-2 md:space-y-0 md:space-x-2 w-full md:w-auto">
           <button
             className={`px-4 py-2 rounded ${
               withinBusinessHours 
                 ? 'bg-green-500 text-white hover:bg-green-600' 
                 : 'bg-gray-300 text-gray-700 cursor-not-allowed'
-            }`}
+            } w-full md:w-auto`}
             onClick={handleAutoDialer}
             disabled={!withinBusinessHours || selectedLeads.length === 0}
           >
-            Auto-Dial Selected Leads
+            Auto-Dial Selected ({selectedLeads.length})
           </button>
           
           <button
-            className="px-4 py-2 rounded bg-red-500 text-white hover:bg-red-600 disabled:opacity-50"
+            className="px-4 py-2 rounded bg-red-500 text-white hover:bg-red-600 disabled:opacity-50 w-full md:w-auto"
             onClick={handleDeleteLeads}
             disabled={selectedLeads.length === 0}
           >
-            Delete Selected Leads
+            Delete Selected
           </button>
-          
-          <span className="ml-2 text-sm flex items-center">
-            {withinBusinessHours 
-              ? '✅ Within business hours' 
-              : `⚠️ Outside business hours (${businessHoursInfo.days || 'M-F'}, ${businessHoursInfo.start || '9:30 AM'}-${businessHoursInfo.end || '4:00 PM'} ${businessHoursInfo.timezone || 'MT'})`}
-          </span>
         </div>
-        <div>
-          <span className="text-sm">Selected: {selectedLeads.length}</span>
+        
+        <div className="flex flex-col md:flex-row space-y-2 md:space-y-0 md:space-x-2 w-full md:w-auto">
+          <input
+            type="text"
+            placeholder="Search leads..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="px-4 py-2 border rounded w-full md:w-60"
+          />
+          
+          <select
+            value={filterStatus}
+            onChange={(e) => setFilterStatus(e.target.value)}
+            className="px-4 py-2 border rounded w-full md:w-40"
+          >
+            <option value="All">All Statuses</option>
+            <option value="Not Called">Not Called</option>
+            <option value="Calling">Calling</option>
+            <option value="Completed">Completed</option>
+            <option value="Interested">Interested</option>
+            <option value="Declined">Declined</option>
+            <option value="Appointment Set">Appointment Set</option>
+          </select>
         </div>
       </div>
+      
+      <div className="text-sm text-gray-600 mb-2">
+        {withinBusinessHours 
+          ? '✅ Within business hours' 
+          : `⚠️ Outside business hours (${businessHoursInfo.days || 'M-F'}, ${businessHoursInfo.start || '9:30 AM'}-${businessHoursInfo.end || '4:00 PM'} ${businessHoursInfo.timezone || 'MT'})`}
+      </div>
 
-      <table className="min-w-full bg-white rounded shadow overflow-hidden">
-        <thead>
-          <tr>
-            <th className="px-4 py-2 w-10">
-              <input 
-                type="checkbox" 
-                onChange={toggleSelectAll}
-                checked={selectedLeads.length === leads.length && leads.length > 0}
-              />
-            </th>
-            <th className="px-4 py-2">Business Name</th>
-            <th className="px-4 py-2">Phone</th>
-            <th className="px-4 py-2">Industry</th>
-            <th className="px-4 py-2">Employees</th>
-            <th className="px-4 py-2">Mobile</th>
-            <th className="px-4 py-2">Status</th>
-            <th className="px-4 py-2">Qualification</th>
-            <th className="px-4 py-2">Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {leads.map((lead) => (
-            <tr key={lead.id} className="border-t">
-              <td className="px-4 py-2">
+      {/* Responsive table with horizontal scrolling for small screens */}
+      <div className="overflow-x-auto bg-white rounded shadow">
+        <table className="min-w-full divide-y divide-gray-200">
+          <thead className="bg-gray-50">
+            <tr>
+              <th className="px-4 py-3 w-10">
                 <input 
                   type="checkbox" 
-                  checked={selectedLeads.includes(lead.id)}
-                  onChange={() => toggleLeadSelection(lead.id)}
+                  onChange={toggleSelectAll}
+                  checked={selectedLeads.length === filteredLeads.length && filteredLeads.length > 0}
+                  className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
                 />
-              </td>
-              <td className="px-4 py-2">{lead.name}</td>
-              <td className="px-4 py-2">{lead.phone}</td>
-              <td className="px-4 py-2">{lead.industry || lead.category}</td>
-              <td className="px-4 py-2">{lead.employee_count || 'Unknown'}</td>
-              <td className="px-4 py-2">{lead.uses_mobile_devices || 'Unknown'}</td>
-              <td className="px-4 py-2">
-                <span className={`px-2 py-1 rounded text-xs font-semibold ${STATUS_COLORS[lead.status] || ''}`}>{lead.status}</span>
-              </td>
-              <td className="px-4 py-2">
-                <span className={`px-2 py-1 rounded text-xs font-semibold ${STATUS_COLORS[lead.qualification_status] || ''}`}>{lead.qualification_status}</span>
-              </td>
-              <td className="px-4 py-2 space-x-2 flex flex-wrap">
-                <button
-                  className="bg-blue-500 text-white px-3 py-1 rounded hover:bg-blue-600 disabled:opacity-50"
-                  disabled={loadingId === lead.id || lead.status === 'Calling'}
-                  onClick={() => handleCall(lead)}
-                  title={!withinBusinessHours ? "Outside business hours - use Manual Call" : ""}
-                >
-                  Auto Call
-                </button>
-                <button
-                  className="bg-orange-500 text-white px-3 py-1 rounded hover:bg-orange-600 disabled:opacity-50"
-                  disabled={loadingId === lead.id || lead.status === 'Calling'}
-                  onClick={() => handleManualCall(lead)}
-                >
-                  Manual Call
-                </button>
-                <button
-                  className="bg-green-500 text-white px-3 py-1 rounded hover:bg-green-600 disabled:opacity-50"
-                  disabled={loadingId === lead.id}
-                  onClick={() => openQualifyModal(lead)}
-                >
-                  Qualify
-                </button>
-                <button
-                  className="bg-purple-500 text-white px-3 py-1 rounded hover:bg-purple-600 disabled:opacity-50"
-                  disabled={loadingId === lead.id}
-                  onClick={() => openAppointmentModal(lead)}
-                >
-                  Book
-                </button>
-                <button
-                  className="bg-yellow-500 text-white px-3 py-1 rounded hover:bg-yellow-600 disabled:opacity-50"
-                  disabled={loadingId === lead.id}
-                  onClick={() => openFollowUpModal(lead)}
-                >
-                  Follow-up
-                </button>
-                <button
-                  className="bg-blue-500 text-white px-3 py-1 rounded hover:bg-blue-600 disabled:opacity-50"
-                  disabled={loadingId === lead.id}
-                  onClick={() => handleTranscript(lead)}
-                >
-                  Transcript
-                </button>
-                <button
-                  className="bg-gray-300 text-gray-700 px-3 py-1 rounded hover:bg-gray-400 disabled:opacity-50"
-                  disabled={loadingId === lead.id}
-                  onClick={() => openHistoryModal(lead)}
-                >
-                  History
-                </button>
-                <button
-                  className="bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600 disabled:opacity-50"
-                  disabled={loadingId === lead.id}
-                  onClick={() => handleDeleteLead(lead.id)}
-                  title="Delete this lead"
-                >
-                  Delete
-                </button>
-              </td>
+              </th>
+              <th 
+                className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                onClick={() => handleSort('name')}
+              >
+                Business Name
+                {sortField === 'name' && (
+                  <span className="ml-1">
+                    {sortDirection === 'asc' ? '↑' : '↓'}
+                  </span>
+                )}
+              </th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Phone</th>
+              <th 
+                className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                onClick={() => handleSort('industry')}
+              >
+                Industry
+                {sortField === 'industry' && (
+                  <span className="ml-1">
+                    {sortDirection === 'asc' ? '↑' : '↓'}
+                  </span>
+                )}
+              </th>
+              <th 
+                className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                onClick={() => handleSort('employee_count')}
+              >
+                Employees
+                {sortField === 'employee_count' && (
+                  <span className="ml-1">
+                    {sortDirection === 'asc' ? '↑' : '↓'}
+                  </span>
+                )}
+              </th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Mobile</th>
+              <th 
+                className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                onClick={() => handleSort('status')}
+              >
+                Status
+                {sortField === 'status' && (
+                  <span className="ml-1">
+                    {sortDirection === 'asc' ? '↑' : '↓'}
+                  </span>
+                )}
+              </th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Qualification</th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody className="bg-white divide-y divide-gray-200">
+            {currentLeads.map((lead) => (
+              <tr key={lead.id} className="hover:bg-gray-50 transition-colors">
+                <td className="px-4 py-3 whitespace-nowrap">
+                  <input 
+                    type="checkbox" 
+                    checked={selectedLeads.includes(lead.id)}
+                    onChange={() => toggleLeadSelection(lead.id)}
+                    className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                  />
+                </td>
+                <td className="px-4 py-3 whitespace-nowrap font-medium text-gray-900">{lead.name}</td>
+                <td className="px-4 py-3 whitespace-nowrap text-gray-600">{lead.phone}</td>
+                <td className="px-4 py-3 whitespace-nowrap text-gray-600">{lead.industry || lead.category}</td>
+                <td className="px-4 py-3 whitespace-nowrap text-gray-600">{lead.employee_count || 'Unknown'}</td>
+                <td className="px-4 py-3 whitespace-nowrap text-gray-600">{lead.uses_mobile_devices || 'Unknown'}</td>
+                <td className="px-4 py-3 whitespace-nowrap">
+                  <span className={`px-2 py-1 rounded text-xs font-semibold ${STATUS_COLORS[lead.status] || ''}`}>{lead.status}</span>
+                </td>
+                <td className="px-4 py-3 whitespace-nowrap">
+                  <span className={`px-2 py-1 rounded text-xs font-semibold ${STATUS_COLORS[lead.qualification_status] || ''}`}>{lead.qualification_status}</span>
+                </td>
+                <td className="px-4 py-3 whitespace-nowrap">
+                  <div className="flex flex-wrap gap-1">
+                    <button
+                      className="bg-blue-500 text-white px-3 py-1 rounded hover:bg-blue-600 disabled:opacity-50 text-xs"
+                      disabled={loadingId === lead.id || lead.status === 'Calling'}
+                      onClick={() => handleCall(lead)}
+                      title={!withinBusinessHours ? "Outside business hours - use Manual Call" : ""}
+                    >
+                      Auto Call
+                    </button>
+                    <button
+                      className="bg-orange-500 text-white px-3 py-1 rounded hover:bg-orange-600 disabled:opacity-50 text-xs"
+                      disabled={loadingId === lead.id || lead.status === 'Calling'}
+                      onClick={() => handleManualCall(lead)}
+                    >
+                      Manual
+                    </button>
+                    <div className="relative group">
+                      <button
+                        className="bg-gray-200 text-gray-700 px-3 py-1 rounded hover:bg-gray-300 disabled:opacity-50 text-xs"
+                        disabled={loadingId === lead.id}
+                      >
+                        More ▾
+                      </button>
+                      <div className="absolute right-0 mt-1 hidden group-hover:block bg-white border rounded shadow-lg z-10 w-32">
+                        <button
+                          className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-100"
+                          onClick={() => openQualifyModal(lead)}
+                        >
+                          Qualify
+                        </button>
+                        <button
+                          className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-100"
+                          onClick={() => openAppointmentModal(lead)}
+                        >
+                          Book
+                        </button>
+                        <button
+                          className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-100"
+                          onClick={() => openFollowUpModal(lead)}
+                        >
+                          Follow-up
+                        </button>
+                        <button
+                          className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-100"
+                          onClick={() => handleTranscript(lead)}
+                        >
+                          Transcript
+                        </button>
+                        <button
+                          className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-100"
+                          onClick={() => openHistoryModal(lead)}
+                        >
+                          History
+                        </button>
+                        <button
+                          className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-100 text-red-600"
+                          onClick={() => handleDeleteLead(lead.id)}
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </td>
+              </tr>
+            ))}
+
+            {currentLeads.length === 0 && (
+              <tr>
+                <td colSpan="9" className="px-4 py-8 text-center text-gray-500">
+                  {filteredLeads.length === 0 ? (
+                    searchTerm || filterStatus !== 'All' ? (
+                      <>
+                        <p className="text-lg">No leads match your search criteria</p>
+                        <p className="text-sm mt-1">Try adjusting your filters</p>
+                      </>
+                    ) : (
+                      <>
+                        <p className="text-lg">No leads found</p>
+                        <p className="text-sm mt-1">Try adding new leads or using the lead scraper</p>
+                      </>
+                    )
+                  ) : (
+                    'Loading leads...'
+                  )}
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Pagination */}
+      {filteredLeads.length > leadsPerPage && (
+        <div className="mt-4 flex justify-between items-center">
+          <div className="flex items-center">
+            <span className="mr-2 text-sm text-gray-600">Leads per page:</span>
+            <select 
+              value={leadsPerPage} 
+              onChange={(e) => {
+                setLeadsPerPage(Number(e.target.value));
+                setCurrentPage(1); // Reset to first page when changing items per page
+              }}
+              className="border rounded px-2 py-1 text-sm"
+            >
+              <option value={10}>10</option>
+              <option value={25}>25</option>
+              <option value={50}>50</option>
+              <option value={100}>100</option>
+            </select>
+            
+            <span className="ml-4 text-sm text-gray-600">
+              Showing {indexOfFirstLead + 1}-{Math.min(indexOfLastLead, filteredLeads.length)} of {filteredLeads.length} leads
+            </span>
+          </div>
+          
+          <div className="flex space-x-1">
+            <button
+              onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+              disabled={currentPage === 1}
+              className="px-3 py-1 border rounded hover:bg-gray-100 disabled:opacity-50"
+            >
+              &laquo;
+            </button>
+            
+            {Array.from({ length: Math.ceil(filteredLeads.length / leadsPerPage) }, (_, i) => {
+              // Only show a window of 5 pages centered around current page
+              if (
+                i === 0 || // First page
+                i === Math.ceil(filteredLeads.length / leadsPerPage) - 1 || // Last page
+                (i >= currentPage - 2 && i <= currentPage + 2) // Pages within window
+              ) {
+                return (
+                  <button
+                    key={i + 1}
+                    onClick={() => paginate(i + 1)}
+                    className={`px-3 py-1 border rounded ${
+                      currentPage === i + 1 ? 'bg-indigo-600 text-white' : 'hover:bg-gray-100'
+                    }`}
+                  >
+                    {i + 1}
+                  </button>
+                );
+              }
+              
+              // Show ellipsis for breaks in sequence
+              if (
+                i === 1 && currentPage > 4 || // After first page
+                i === Math.ceil(filteredLeads.length / leadsPerPage) - 2 && currentPage < Math.ceil(filteredLeads.length / leadsPerPage) - 3 // Before last page
+              ) {
+                return (
+                  <span key={i} className="px-3 py-1">
+                    ...
+                  </span>
+                );
+              }
+              
+              return null;
+            })}
+            
+            <button
+              onClick={() => setCurrentPage(Math.min(Math.ceil(filteredLeads.length / leadsPerPage), currentPage + 1))}
+              disabled={currentPage === Math.ceil(filteredLeads.length / leadsPerPage)}
+              className="px-3 py-1 border rounded hover:bg-gray-100 disabled:opacity-50"
+            >
+              &raquo;
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Transcript Modal */}
       {transcript && (

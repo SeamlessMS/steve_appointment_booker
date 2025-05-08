@@ -10,7 +10,7 @@ import AnalyticsDashboard from './components/AnalyticsDashboard';
 import AITrainingInterface from './components/AITrainingInterface';
 import axios from 'axios';
 
-const API_BASE = process.env.REACT_APP_API_BASE || 'http://localhost:5003/api';
+const API_BASE = process.env.REACT_APP_API_BASE || 'http://localhost:5001/api';
 
 function App() {
   const [leads, setLeads] = useState([]);
@@ -20,6 +20,7 @@ function App() {
   const [addLeadOpen, setAddLeadOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('leads');
   const [testMode, setTestMode] = useState(true);
+  const [notification, setNotification] = useState({ show: false, message: '', type: '' });
   const [scrapeParams, setScrapeParams] = useState({
     location: 'Denver, CO',
     industry: 'Plumbing',
@@ -46,15 +47,38 @@ function App() {
     fetchLeads();
     fetchConfig();
   }, []);
+  
+  // Hide notification after a delay
+  useEffect(() => {
+    if (notification.show) {
+      const timer = setTimeout(() => {
+        setNotification({ ...notification, show: false });
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [notification]);
 
   const handleScrape = async () => {
     setScraping(true);
     
     try {
-      await axios.post(`${API_BASE}/scrape`, scrapeParams);
+      const response = await axios.post(`${API_BASE}/scrape`, scrapeParams);
+      console.log('Scraping response:', response.data);
       await fetchLeads();
+      
+      // Show success notification
+      setNotification({
+        show: true,
+        type: 'success',
+        message: `Successfully added ${response.data.count} new leads!`
+      });
     } catch (error) {
       console.error("Error scraping leads:", error);
+      setNotification({
+        show: true,
+        type: 'error',
+        message: 'Error finding new leads. Please try again.'
+      });
     } finally {
       setScraping(false);
     }
@@ -70,6 +94,30 @@ function App() {
 
   return (
     <div className="min-h-screen bg-gray-50 p-8">
+      {/* Toast Notification */}
+      {notification.show && (
+        <div className="fixed top-4 right-4 z-50 max-w-md animate-fade-in-down">
+          <div className={`px-6 py-4 rounded-lg shadow-lg ${
+            notification.type === 'success' 
+              ? 'bg-green-100 border-l-4 border-green-500 text-green-700' 
+              : 'bg-red-100 border-l-4 border-red-500 text-red-700'
+          }`}>
+            <div className="flex items-center">
+              {notification.type === 'success' ? (
+                <svg className="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                </svg>
+              ) : (
+                <svg className="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              )}
+              <p>{notification.message}</p>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="flex justify-between items-center mb-8">
         <div className="flex items-center">
           <h1 className="text-3xl font-bold">Seamless Mobile Services Appointment Booker</h1>
@@ -145,6 +193,7 @@ function App() {
                   value={scrapeParams.location}
                   onChange={handleScrapeParamChange}
                   className="w-full border p-2 rounded"
+                  disabled={scraping}
                 >
                   <option value="Denver, CO">Denver, CO</option>
                   <option value="Colorado Springs, CO">Colorado Springs, CO</option>
@@ -159,6 +208,7 @@ function App() {
                   value={scrapeParams.industry}
                   onChange={handleScrapeParamChange}
                   className="w-full border p-2 rounded"
+                  disabled={scraping}
                 >
                   <optgroup label="Field Service Businesses">
                     <option value="Plumbing">Plumbing Companies</option>
@@ -193,14 +243,6 @@ function App() {
                   <optgroup label="Mobile Healthcare & Home Services">
                     <option value="Home Care">In-home Care Agencies</option>
                     <option value="Mobile Testing">Mobile Lab Testing</option>
-                    <option value="Therapy">On-site Therapy Services</option>
-                  </optgroup>
-                  <optgroup label="Multi-location Small Chains">
-                    <option value="Property Management">Property Management</option>
-                    <option value="Car Dealership">Car Dealerships</option>
-                    <option value="Franchise">Franchise Service Businesses</option>
-                    <option value="Security">Private Security Companies</option>
-                    <option value="Education">Schools & Tutoring Centers</option>
                   </optgroup>
                 </select>
               </div>
@@ -213,17 +255,39 @@ function App() {
                   onChange={handleScrapeParamChange}
                   className="w-full border p-2 rounded"
                   min="1"
-                  max="100"
+                  max="50"
+                  disabled={scraping}
                 />
               </div>
             </div>
             <button
-              className="bg-indigo-600 text-white px-6 py-2 rounded hover:bg-indigo-700 disabled:opacity-50"
+              className={`px-4 py-2 rounded flex items-center justify-center w-full sm:w-auto
+                ${scraping ? 'bg-blue-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'}`}
               onClick={handleScrape}
               disabled={scraping}
             >
-              {scraping ? 'Finding Leads...' : 'Find New Leads'}
+              {scraping ? (
+                <>
+                  <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  <span className="text-white">Searching for leads...</span>
+                </>
+              ) : (
+                <span className="text-white">Find New Leads</span>
+              )}
             </button>
+            
+            {scraping && (
+              <div className="mt-4 p-4 bg-blue-50 border border-blue-100 rounded text-sm text-blue-800">
+                <p className="font-medium">⚙️ Lead search in progress</p>
+                <p className="mt-1">Searching for {scrapeParams.industry} businesses in {scrapeParams.location}. This may take up to 30 seconds.</p>
+                <div className="mt-2 w-full bg-blue-200 rounded-full h-2.5">
+                  <div className="bg-blue-600 h-2.5 rounded-full animate-pulse w-full"></div>
+                </div>
+              </div>
+            )}
           </div>
 
           {loading ? (
