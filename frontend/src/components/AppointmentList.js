@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import { exportToCSV, exportToExcel, getFormattedDate } from '../utils/exportUtils';
 
 const API_BASE = process.env.REACT_APP_API_BASE || 'http://localhost:5002/api';
 
@@ -24,6 +25,8 @@ export default function AppointmentList() {
     notes: ''
   });
   const [availableTimes, setAvailableTimes] = useState([]);
+  const [showExportDropdown, setShowExportDropdown] = useState(false);
+  const [notification, setNotification] = useState({ show: false, message: '', type: '' });
 
   // Fetch appointments on component mount
   useEffect(() => {
@@ -216,6 +219,66 @@ export default function AppointmentList() {
     }
   };
 
+  // New function to handle export to CSV
+  const handleExportCSV = () => {
+    const headers = [
+      { title: 'Business Name', key: 'lead_name' },
+      { title: 'Date', key: 'date' },
+      { title: 'Time', key: 'time' },
+      { title: 'Medium', key: 'medium' },
+      { title: 'Status', key: 'status' },
+      { title: 'Phone', key: 'lead_phone' },
+      { title: 'Notes', key: 'notes' }
+    ];
+    
+    const filename = `appointments_export_${getFormattedDate()}.csv`;
+    
+    exportToCSV(appointments, headers, filename);
+    
+    // Show success notification
+    setNotification({
+      show: true,
+      type: 'success',
+      message: `Exported ${appointments.length} appointments to CSV`
+    });
+    
+    // Hide notification after 3 seconds
+    setTimeout(() => setNotification({ show: false, message: '', type: '' }), 3000);
+    
+    // Hide dropdown
+    setShowExportDropdown(false);
+  };
+  
+  // New function to handle export to Excel
+  const handleExportExcel = () => {
+    const headers = [
+      { title: 'Business Name', key: 'lead_name' },
+      { title: 'Date', key: 'date' },
+      { title: 'Time', key: 'time' },
+      { title: 'Medium', key: 'medium' },
+      { title: 'Status', key: 'status' },
+      { title: 'Phone', key: 'lead_phone' },
+      { title: 'Notes', key: 'notes' }
+    ];
+    
+    const filename = `appointments_export_${getFormattedDate()}`;
+    
+    exportToExcel(appointments, headers, filename);
+    
+    // Show success notification
+    setNotification({
+      show: true,
+      type: 'success',
+      message: `Exported ${appointments.length} appointments to Excel`
+    });
+    
+    // Hide notification after 3 seconds
+    setTimeout(() => setNotification({ show: false, message: '', type: '' }), 3000);
+    
+    // Hide dropdown
+    setShowExportDropdown(false);
+  };
+
   if (loading) {
     return <div className="text-center py-4">Loading appointments...</div>;
   }
@@ -228,6 +291,45 @@ export default function AppointmentList() {
           Using the Schiffman Method for appointment success
         </div>
       </div>
+      
+      {/* Export dropdown button */}
+      <div className="flex justify-end items-center mb-4">
+        <div className="relative">
+          <button
+            className="px-4 py-2 rounded bg-indigo-500 text-white hover:bg-indigo-600"
+            onClick={() => setShowExportDropdown(!showExportDropdown)}
+          >
+            Export Appointments
+          </button>
+          
+          {showExportDropdown && (
+            <div className="absolute right-0 mt-1 bg-white border rounded shadow-lg z-10 w-40">
+              <button
+                className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-100"
+                onClick={handleExportCSV}
+              >
+                Export to CSV
+              </button>
+              <button
+                className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-100"
+                onClick={handleExportExcel}
+              >
+                Export to Excel
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+      
+      {/* Notification component */}
+      {notification.show && (
+        <div className={`mb-4 p-3 rounded ${
+          notification.type === 'success' ? 'bg-green-100 text-green-800 border border-green-200' 
+          : 'bg-red-100 text-red-800 border border-red-200'
+        }`}>
+          {notification.message}
+        </div>
+      )}
       
       {appointments.length === 0 ? (
         <div className="text-center py-8 bg-gray-50 rounded">

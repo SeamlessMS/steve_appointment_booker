@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { callLead, manualCallLead, autoDialLeads, checkBusinessHours, updateLead, getCallLogs, addFollowUp, deleteLead, deleteLeads } from '../api';
 import axios from 'axios';
 import LeadHistoryModal from './LeadHistoryModal';
+import { exportToCSV, exportToExcel, getFormattedDate } from '../utils/exportUtils';
 
 // Get API base from the imported functions (used in axios calls)
 const API_BASE = process.env.REACT_APP_API_BASE || 'http://localhost:5001/api';
@@ -57,6 +58,9 @@ export default function LeadTable({ leads, onStatusChange }) {
   const [filterStatus, setFilterStatus] = useState('All');
   const [sortField, setSortField] = useState('name');
   const [sortDirection, setSortDirection] = useState('asc');
+
+  // Add new state for export dropdown
+  const [showExportDropdown, setShowExportDropdown] = useState(false);
 
   useEffect(() => {
     // Check business hours when component mounts
@@ -496,6 +500,78 @@ export default function LeadTable({ leads, onStatusChange }) {
   // Change page
   const paginate = (pageNumber) => setCurrentPage(pageNumber);
 
+  // New function to handle export to CSV
+  const handleExportCSV = () => {
+    const headers = [
+      { title: 'Business Name', key: 'name' },
+      { title: 'Phone', key: 'phone' },
+      { title: 'Industry', key: 'industry' },
+      { title: 'Category', key: 'category' },
+      { title: 'Employees', key: 'employee_count' },
+      { title: 'Mobile Devices', key: 'uses_mobile_devices' },
+      { title: 'Status', key: 'status' },
+      { title: 'Qualification', key: 'qualification_status' },
+      { title: 'Email', key: 'email' },
+      { title: 'Website', key: 'website' },
+      { title: 'Address', key: 'address' },
+      { title: 'Notes', key: 'notes' }
+    ];
+    
+    const filename = `leads_export_${getFormattedDate()}.csv`;
+    
+    // Use the filtered and sorted leads for export
+    exportToCSV(sortedLeads, headers, filename);
+    
+    // Show success notification
+    setNotification({
+      show: true,
+      type: 'success',
+      message: `Exported ${sortedLeads.length} leads to CSV`
+    });
+    
+    // Hide notification after 3 seconds
+    setTimeout(() => setNotification({ show: false, message: '', type: '' }), 3000);
+    
+    // Hide dropdown
+    setShowExportDropdown(false);
+  };
+  
+  // New function to handle export to Excel
+  const handleExportExcel = () => {
+    const headers = [
+      { title: 'Business Name', key: 'name' },
+      { title: 'Phone', key: 'phone' },
+      { title: 'Industry', key: 'industry' },
+      { title: 'Category', key: 'category' },
+      { title: 'Employees', key: 'employee_count' },
+      { title: 'Mobile Devices', key: 'uses_mobile_devices' },
+      { title: 'Status', key: 'status' },
+      { title: 'Qualification', key: 'qualification_status' },
+      { title: 'Email', key: 'email' },
+      { title: 'Website', key: 'website' },
+      { title: 'Address', key: 'address' },
+      { title: 'Notes', key: 'notes' }
+    ];
+    
+    const filename = `leads_export_${getFormattedDate()}`;
+    
+    // Use the filtered and sorted leads for export
+    exportToExcel(sortedLeads, headers, filename);
+    
+    // Show success notification
+    setNotification({
+      show: true,
+      type: 'success',
+      message: `Exported ${sortedLeads.length} leads to Excel`
+    });
+    
+    // Hide notification after 3 seconds
+    setTimeout(() => setNotification({ show: false, message: '', type: '' }), 3000);
+    
+    // Hide dropdown
+    setShowExportDropdown(false);
+  };
+
   return (
     <div>
       {notification.show && (
@@ -528,6 +604,33 @@ export default function LeadTable({ leads, onStatusChange }) {
           >
             Delete Selected
           </button>
+          
+          {/* Export dropdown button */}
+          <div className="relative">
+            <button
+              className="px-4 py-2 rounded bg-indigo-500 text-white hover:bg-indigo-600 w-full md:w-auto"
+              onClick={() => setShowExportDropdown(!showExportDropdown)}
+            >
+              Export Data
+            </button>
+            
+            {showExportDropdown && (
+              <div className="absolute left-0 mt-1 bg-white border rounded shadow-lg z-10 w-40">
+                <button
+                  className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-100"
+                  onClick={handleExportCSV}
+                >
+                  Export to CSV
+                </button>
+                <button
+                  className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-100"
+                  onClick={handleExportExcel}
+                >
+                  Export to Excel
+                </button>
+              </div>
+            )}
+          </div>
         </div>
         
         <div className="flex flex-col md:flex-row space-y-2 md:space-y-0 md:space-x-2 w-full md:w-auto">
@@ -741,8 +844,8 @@ export default function LeadTable({ leads, onStatusChange }) {
 
       {/* Pagination */}
       {filteredLeads.length > leadsPerPage && (
-        <div className="mt-4 flex flex-col md:flex-row justify-between items-start md:items-center">
-          <div className="flex items-center mb-2 md:mb-0">
+        <div className="mt-4 flex justify-between items-center">
+          <div className="flex items-center">
             <span className="mr-2 text-sm text-gray-600">Leads per page:</span>
             <select 
               value={leadsPerPage} 
@@ -763,7 +866,7 @@ export default function LeadTable({ leads, onStatusChange }) {
             </span>
           </div>
           
-          <div className="pagination-container">
+          <div className="flex space-x-1">
             <button
               onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
               disabled={currentPage === 1}

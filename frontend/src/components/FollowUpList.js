@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { getFollowUps, updateFollowUp, runAutoFollowUp } from '../api';
+import { exportToCSV, exportToExcel, getFormattedDate } from '../utils/exportUtils';
 
 const STATUS_COLORS = {
   'Pending': 'bg-yellow-200 text-yellow-700',
@@ -41,6 +42,7 @@ export default function FollowUpList() {
   const [filter, setFilter] = useState('Pending');
   const [autoLoading, setAutoLoading] = useState(false);
   const [notification, setNotification] = useState({ show: false, message: '', type: '' });
+  const [showExportDropdown, setShowExportDropdown] = useState(false);
   
   // Load follow-ups
   const loadFollowUps = async () => {
@@ -156,6 +158,68 @@ export default function FollowUpList() {
     }, 3000);
   };
   
+  // New function to handle export to CSV
+  const handleExportCSV = () => {
+    const headers = [
+      { title: 'Business Name', key: 'lead_name' },
+      { title: 'Scheduled Time', key: 'scheduled_time' },
+      { title: 'Status', key: 'status' },
+      { title: 'Priority', key: 'priority' },
+      { title: 'Reason', key: 'reason' },
+      { title: 'Notes', key: 'notes' }
+    ];
+    
+    const filename = `followups_export_${getFormattedDate()}.csv`;
+    
+    exportToCSV(followUps, headers, filename);
+    
+    // Show success notification
+    setNotification({
+      show: true,
+      message: `Exported ${followUps.length} follow-ups to CSV`,
+      type: 'success'
+    });
+    
+    // Hide notification after 3 seconds
+    setTimeout(() => {
+      setNotification({ show: false, message: '', type: '' });
+    }, 3000);
+    
+    // Hide dropdown
+    setShowExportDropdown(false);
+  };
+  
+  // New function to handle export to Excel
+  const handleExportExcel = () => {
+    const headers = [
+      { title: 'Business Name', key: 'lead_name' },
+      { title: 'Scheduled Time', key: 'scheduled_time' },
+      { title: 'Status', key: 'status' },
+      { title: 'Priority', key: 'priority' },
+      { title: 'Reason', key: 'reason' },
+      { title: 'Notes', key: 'notes' }
+    ];
+    
+    const filename = `followups_export_${getFormattedDate()}`;
+    
+    exportToExcel(followUps, headers, filename);
+    
+    // Show success notification
+    setNotification({
+      show: true,
+      message: `Exported ${followUps.length} follow-ups to Excel`,
+      type: 'success'
+    });
+    
+    // Hide notification after 3 seconds
+    setTimeout(() => {
+      setNotification({ show: false, message: '', type: '' });
+    }, 3000);
+    
+    // Hide dropdown
+    setShowExportDropdown(false);
+  };
+  
   return (
     <div className="p-4">
       <div className="flex justify-between items-center mb-4">
@@ -173,6 +237,33 @@ export default function FollowUpList() {
             <option value="Completed">Completed</option>
             <option value="Cancelled">Cancelled</option>
           </select>
+          
+          {/* Export dropdown button */}
+          <div className="relative">
+            <button
+              className="bg-indigo-500 text-white px-4 py-2 rounded hover:bg-indigo-600"
+              onClick={() => setShowExportDropdown(!showExportDropdown)}
+            >
+              Export Data
+            </button>
+            
+            {showExportDropdown && (
+              <div className="absolute right-0 mt-1 bg-white border rounded shadow-lg z-10 w-40">
+                <button
+                  className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-100"
+                  onClick={handleExportCSV}
+                >
+                  Export to CSV
+                </button>
+                <button
+                  className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-100"
+                  onClick={handleExportExcel}
+                >
+                  Export to Excel
+                </button>
+              </div>
+            )}
+          </div>
           
           <button
             className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 disabled:opacity-50"
